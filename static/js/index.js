@@ -1402,7 +1402,7 @@ var gamepadTestEvents = [];
 
 function gamepadTestLog(text) {
   gamepadTestEvents.push(new Date().toLocaleTimeString() + ' ' + text);
-  if (gamepadTestEvents.length > 6) {
+  if (gamepadTestEvents.length > 10) {
     gamepadTestEvents.shift();
   }
 }
@@ -1413,6 +1413,12 @@ window.addEventListener('gamepadconnected', function (e) {
 window.addEventListener('gamepaddisconnected', function (e) {
   gamepadTestLog('disconnected: #' + e.gamepad.index);
 });
+// Keys reaching the app (some TVs expose a Bluetooth controller as a remote)
+document.addEventListener('keydown', function (e) {
+  if (document.querySelector('#gamepadTestDialog').open) {
+    gamepadTestLog('KEY keyCode=' + e.keyCode + ' key=' + e.key);
+  }
+}, true);
 window.addEventListener('gamepadbuttonpressed', function (e) {
   if (e.detail.pressed) {
     gamepadTestLog('app received button ' + e.detail.key);
