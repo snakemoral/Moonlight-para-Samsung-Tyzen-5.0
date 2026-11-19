@@ -1,11 +1,15 @@
 name: Build MoonlightNaCl.wgt
 
-# Runs when you push to main/master, or manually from the "Actions" tab
-# (Actions -> Build MoonlightNaCl.wgt -> Run workflow).
+# - Push to main/master or manual run: builds and uploads the .wgt as an artifact.
+# - Push of a tag like v0.2.0: also publishes a GitHub Release with the .wgt attached.
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    tags: ['v*']
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,6 +18,14 @@ jobs:
     steps:
       - name: Get the source
         uses: actions/checkout@v4
+
+      - name: Check the tag matches config.xml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cfg=$(grep -o 'version="[0-9.]*"' config.xml | head -1 | cut -d'"' -f2)
+          tag="${GITHUB_REF_NAME#v}"
+          echo "config.xml=$cfg tag=$tag"
+          [ "$cfg" = "$tag" ] || { echo "Tag $tag does not match config.xml version $cfg"; exit 1; }
 
       # The Dockerfile downloads Tizen Studio and the Samsung NaCl SDK, compiles
       # the app and packages/signs the .wgt.
@@ -34,3 +46,13 @@ jobs:
           name: MoonlightNaCl-wgt
           path: out/MoonlightNaCl.wgt
           if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/MoonlightNaCl.wgt "out/MoonlightNaCl-${GITHUB_REF_NAME}.wgt"
+          gh release create "$GITHUB_REF_NAME" "out/MoonlightNaCl-${GITHUB_REF_NAME}.wgt" \
+            --title "Moonlight NaCl Plus $GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md
