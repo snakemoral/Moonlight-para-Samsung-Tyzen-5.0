@@ -1,12 +1,13 @@
 name: Build MoonlightNaCl.wgt
 
-# - Push to main/master or manual run: builds and uploads the .wgt as an artifact.
-# - Push of a tag like v0.2.0: also publishes a GitHub Release with the .wgt attached.
+# Every push to main/master (or manual run) builds the .wgt and uploads it as an artifact.
+# If the version in config.xml has no release yet, a GitHub Release (tag vX.Y.Z) is
+# created automatically with the .wgt attached. To publish a new release, raise the
+# version in config.xml.
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
-    tags: ['v*']
 
 permissions:
   contents: write
@@ -18,14 +19,6 @@ jobs:
     steps:
       - name: Get the source
         uses: actions/checkout@v4
-
-      - name: Check the tag matches config.xml
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          cfg=$(grep -o 'version="[0-9.]*"' config.xml | head -1 | cut -d'"' -f2)
-          tag="${GITHUB_REF_NAME#v}"
-          echo "config.xml=$cfg tag=$tag"
-          [ "$cfg" = "$tag" ] || { echo "Tag $tag does not match config.xml version $cfg"; exit 1; }
 
       # The Dockerfile downloads Tizen Studio and the Samsung NaCl SDK, compiles
       # the app and packages/signs the .wgt.
@@ -47,12 +40,18 @@ jobs:
           path: out/MoonlightNaCl.wgt
           if-no-files-found: error
 
-      - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish the release (if this version has none yet)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp out/MoonlightNaCl.wgt "out/MoonlightNaCl-${GITHUB_REF_NAME}.wgt"
-          gh release create "$GITHUB_REF_NAME" "out/MoonlightNaCl-${GITHUB_REF_NAME}.wgt" \
-            --title "Moonlight NaCl Plus $GITHUB_REF_NAME" \
+          ver=$(grep -o 'version="[0-9.]*"' config.xml | head -1 | cut -d'"' -f2)
+          tag="v$ver"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists, skipping."
+            exit 0
+          fi
+          cp out/MoonlightNaCl.wgt "out/MoonlightNaCl-$tag.wgt"
+          gh release create "$tag" "out/MoonlightNaCl-$tag.wgt" \
+            --target "$GITHUB_SHA" \
+            --title "Moonlight NaCl Plus $tag" \
             --notes-file RELEASE_NOTES.md
