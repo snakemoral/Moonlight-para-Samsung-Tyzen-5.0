@@ -1,0 +1,36 @@
+name: Build MoonlightNaCl.wgt
+
+# Runs when you push to main/master, or manually from the "Actions" tab
+# (Actions -> Build MoonlightNaCl.wgt -> Run workflow).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Get the source
+        uses: actions/checkout@v4
+
+      # The Dockerfile downloads Tizen Studio and the Samsung NaCl SDK, compiles
+      # the app and packages/signs the .wgt.
+      - name: Build (Dockerfile)
+        run: docker build -t moonlight-nacl-plus .
+
+      - name: Extract the .wgt from the image
+        run: |
+          mkdir -p out
+          docker create --name mlx moonlight-nacl-plus
+          docker cp mlx:/home/moonlight/MoonlightNaCl.wgt out/MoonlightNaCl.wgt
+          docker rm mlx
+          ls -l out
+
+      - name: Upload the .wgt
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonlightNaCl-wgt
+          path: out/MoonlightNaCl.wgt
+          if-no-files-found: error

@@ -330,3 +330,77 @@ main {
 #nacl_module {
     cursor: none;
 }
+/* ---------------------------------------------------------------------------
+   Styles ported from the current Moonlight for Tizen (WASM) app
+   --------------------------------------------------------------------------- */
+
+/* Per-host settings button (replaces the old "remove host" icon) */
+.host-settings {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    width: 24px;
+    height: 24px;
+    z-index: 5;
+    background-image: url('../res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg');
+    background-repeat: no-repeat;
+    background-size: 20px 20px;
+    background-position: center;
+    border: 0;
+    cursor: pointer;
+}
+
+/* Clear highlight for whatever the remote/controller has selected */
+#continueAddHost:focus, #cancelAddHost:focus,
+#continueDeleteHost:focus, #cancelDeleteHost:focus,
+#cancelPairingDialog:focus,
+#backIcon:focus, #quitCurrentApp:focus,
+#continueQuitApp:focus, #cancelQuitApp:focus,
+#exitTerminateMoonlight:focus, #cancelTerminateMoonlight:focus,
+.mdl-icon-toggle:focus, .mdl-button:focus {
+    background-color: #404354;
+    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
+}
+#ipPart1.hovered, #ipPart2.hovered, #ipPart3.hovered, #ipPart4.hovered {
+    background-color: #404354;
+    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
+    color: white;
+}
+.mdl-textfield__input.hovered {
+    background-color: #404354;
+}
+
+/* TV model / app version / Tizen version, bottom left */
+#modelCodePlaceholder {
+    position: fixed;
+    bottom: 1cm;
+    left: 1cm;
+    font-size: 12px;
+}
+
+/* Host settings dialog: one full-width button per action */
+dialog[id^="settingsDialog-"] .mdl-dialog__content {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+dialog[id^="settingsDialog-"] .mdl-dialog__content button {
+    margin-bottom: 10px;
+    width: 100%;
+}
+dialog[id^="settingsDialog-"] .mdl-dialog__actions button {
+    width: 100%;
+}
+
+/* Add Host dialog: IP address selectors */
+#addHostDialog .mdl-textfield {
+    width: 100%;
+}
+#addHostDialog select {
+    background-color: #333846;
+    color: white;
+    font-size: 1.2rem;
+}
+#manualIPAddress {
+    width: 100%;
+}

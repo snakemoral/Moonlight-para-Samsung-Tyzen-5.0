@@ -90,9 +90,10 @@ String.prototype.toHex = function() {
   return hex;
 }
 
-function NvHTTP (address, clientUid, userEnteredAddress) {
+function NvHTTP (address, clientUid, userEnteredAddress, macAddress) {
   console.log('%c[utils.js, NvHTTP Object]', 'color: gray;', this);
   this.address = address;
+  this.macAddress = macAddress; // used by Wake-on-LAN
   this.ppkstr = null;
   this.paired = false;
   this.currentGame = 0;
@@ -217,6 +218,7 @@ NvHTTP.prototype = {
       // as online initially
       if (this.paired && this._pollCount++ % 10 == 1) {
         this.getAppListWithCacheFlush();
+        updateMacAddress(this); // keep the stored MAC address (used by Wake-on-LAN) up to date
       }
 
       this._consecutivePollFailures = 0;
@@ -267,6 +269,7 @@ NvHTTP.prototype = {
     var string = '';
     string += 'server address: ' + this.address + '\r\n';
     string += 'server UID: ' + this.serverUid + '\r\n';
+    string += 'mac address: ' + this.macAddress + '\r\n';
     string += 'is paired: ' + this.paired + '\r\n';
     string += 'current game: ' + this.currentGame + '\r\n';
     string += 'server major version: ' + this.serverMajorVersion + '\r\n';
@@ -302,6 +305,12 @@ NvHTTP.prototype = {
     this.serverMajorVersion = parseInt(this.appVersion.substring(0, 1), 10);
     this.serverUid = $root.find('uniqueid').text().trim();
     this.hostname = $root.find('hostname').text().trim();
+    // Hosts report 00:00:00:00:00:00 when they don't know their MAC address.
+    // Never replace a good stored address with that.
+    var reportedMac = $root.find('mac').text().trim();
+    if (reportedMac && reportedMac != '00:00:00:00:00:00') {
+      this.macAddress = reportedMac;
+    }
 
     var externIP = $root.find('ExternalIP').text().trim();
     if (externIP) {
@@ -417,72 +426,156 @@ NvHTTP.prototype = {
 
   // returns the box art of the given appID.
   // three layers of response time are possible: memory cached (in javascript), storage cached (in chrome.storage.local), and streamed (host sends binary over the network)
-  getBoxArt: function (appId) {
-    // if (chrome.storage) {
-    //   // This may be bad practice to push/pull this much data through local storage?
-    //   return new Promise(function(resolve, reject) {
-    //     chrome.storage.local.get('boxart-' + appId, function(storageData) {
-    //       // if we already have it, load it.
-    //       if (storageData !== undefined && Object.keys(storageData).length !== 0 && storageData['boxart-' + appId].constructor !== Object) {
-    //         console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
-    //         resolve(storageData['boxart-' + appId]);
-    //         return;
-    //       }
+  // ---------------------------------------------------------------------------
+  // Box art cache
+  //
+  // Box art is kept in the app's private storage so the app list does not have
+  // to download every image from the host each time it is opened. Every storage
+  // access is wrapped in try/catch: if this TV refuses it (or the API is not
+  // available on this firmware) we silently fall back to downloading the image,
+  // exactly like the previous version did.
+  // ---------------------------------------------------------------------------
 
-    //       // otherwise, put it in our cache, then return it
-    //       sendMessage('openUrl', [
-    //         this._baseUrlHttps +
-    //         '/appasset?' + this._buildUidStr() +
-    //         '&appid=' + appId +
-    //         '&AssetType=2&AssetIdx=0',
-    //         this.ppkstr,
-    //         true
-    //       ]).then(function(boxArtBuffer) {
-    //         var reader = new FileReader();
-    //         reader.onloadend = function() {
-    //           var obj = {};
-    //           obj['boxart-' + appId] = this.result;
-    //           chrome.storage.local.set(obj, function(onSuccess) {});
-    //           console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
-    //           resolve(this.result);
-    //         }
-    //         reader.readAsDataURL(new Blob([boxArtBuffer], {
-    //           type: "image/png"
-    //         }));
-    //       }.bind(this), function(error) {
-    //         console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
-    //         reject(error);
-    //         return;
-    //       }.bind(this));
-    //     }.bind(this));
-    //   }.bind(this));
+  // Folder name (inside wgt-private) used for this host's box art
+  _boxArtDirName: function () {
+    var id = this.serverUid || this.hostname || 'host';
+    return 'boxart-' + String(id).replace(/[^A-Za-z0-9_-]/g, '_');
+  },
 
-    // } else { // shouldn't run because we always have chrome.storage, but I'm not going to antagonize other browsers
-    console.warn('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'chrome.storage not detected! Box art will not be saved!');
-    return new Promise((resolve, reject) => {
-      sendMessage('openUrl', [
-        this._baseUrlHttps +
-        '/appasset?' + this._buildUidStr() +
-        '&appid=' + appId +
-        '&AssetType=2&AssetIdx=0',
-        this.ppkstr,
-        true
-      ]).then((boxArtBuffer) => {
-        var reader = new FileReader();
-        reader.onloadend = function () {
-          var obj = {};
-          obj['boxart-' + appId] = this.result;
-          console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
-          resolve(this.result);
+  // "Refresh box art" bumps this number, which makes every cached file stale
+  _boxArtGeneration: function () {
+    try {
+      return parseInt(window.localStorage.getItem('boxArtGen-' + this.serverUid), 10) || 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  // Creates the host's box art folder if it does not exist yet. Never rejects:
+  // if it fails, the later read/write attempts fail too and we use the network.
+  _ensureBoxArtDir: function () {
+    var dirName = this._boxArtDirName();
+    this._boxArtDirPromises = this._boxArtDirPromises || {};
+    if (!this._boxArtDirPromises[dirName]) {
+      this._boxArtDirPromises[dirName] = new Promise(function (resolve) {
+        try {
+          tizen.filesystem.resolve('wgt-private', function (root) {
+            try {
+              root.resolve(dirName);
+            } catch (notFound) {
+              try {
+                root.createDirectory(dirName);
+              } catch (createError) {
+                console.warn('%c[utils.js, _ensureBoxArtDir]', 'color: gray;', 'Could not create box art folder', createError);
+              }
+            }
+            resolve();
+          }, function () {
+            resolve();
+          }, 'rw');
+        } catch (e) {
+          resolve();
         }
-        reader.readAsDataURL(new Blob([boxArtBuffer], {
-          type: "image/png"
-        }));
-      }, (error) => {
-        console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
-        reject(error);
-        return;
       });
+    }
+    return this._boxArtDirPromises[dirName];
+  },
+
+  getBoxArt: function (appId) {
+    return this._ensureBoxArtDir().then(function () {
+      return new Promise(function (resolve, reject) {
+        var boxArtFilePath = 'wgt-private/' + this._boxArtDirName() +
+          '/boxart-' + appId + '-g' + this._boxArtGeneration();
+
+        var fetchFromNetwork = function () {
+          sendMessage('openUrl', [
+            this._baseUrlHttps +
+            '/appasset?' + this._buildUidStr() +
+            '&appid=' + appId +
+            '&AssetType=2&AssetIdx=0',
+            this.ppkstr,
+            true
+          ]).then(function (boxArtBuffer) {
+            var reader = new FileReader();
+            reader.onloadend = function () {
+              var dataUrl = reader.result;
+              try {
+                var writeHandle = tizen.filesystem.openFile(boxArtFilePath, 'w', true);
+                writeHandle.writeData(new Uint8Array(boxArtBuffer));
+                writeHandle.close();
+              } catch (writeError) {
+                // Not fatal: we still have the image, it just won't be cached
+                console.warn('%c[utils.js, getBoxArt]', 'color: gray;', 'Could not cache box art', writeError);
+              }
+              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
+              resolve(dataUrl);
+            };
+            reader.readAsDataURL(new Blob([boxArtBuffer], {
+              type: 'image/png'
+            }));
+          }, function (error) {
+            console.error('%c[utils.js, getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
+            reject(error);
+          });
+        }.bind(this);
+
+        // 1) Cache hit?
+        try {
+          var readHandle = tizen.filesystem.openFile(boxArtFilePath, 'r');
+          var cachedBlob = readHandle.readBlob();
+          readHandle.close();
+
+          var cachedReader = new FileReader();
+          cachedReader.onloadend = function () {
+            // A tiny result means an empty/corrupt file: download it again
+            if (cachedReader.result && cachedReader.result.length > 100) {
+              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
+              resolve(cachedReader.result);
+            } else {
+              fetchFromNetwork();
+            }
+          };
+          // The stored file has no type: tag it as an image so the data URL is correct
+          cachedReader.readAsDataURL(new Blob([cachedBlob], { type: 'image/png' }));
+          return;
+        } catch (notCached) {
+          // Not cached yet (or storage unavailable): use the network
+        }
+
+        // 2) Download and (try to) cache
+        fetchFromNetwork();
+      }.bind(this));
+    }.bind(this));
+  },
+
+  // Makes every cached image stale, so they are downloaded again next time
+  purgeBoxArt: function () {
+    return new Promise(function (resolve, reject) {
+      try {
+        window.localStorage.setItem('boxArtGen-' + this.serverUid, String(this._boxArtGeneration() + 1));
+        console.log('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Box art cache invalidated for host:', this.hostname);
+        snackbarLog('Box art will be downloaded again the next time you open the apps list');
+        resolve();
+      } catch (e) {
+        console.error('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Failed to invalidate the box art cache!', e);
+        snackbarLog('Could not refresh box art');
+        reject(e);
+      }
+    }.bind(this));
+  },
+
+  // Wake-on-LAN: the magic packet is sent by the native module
+  sendWOL: function () {
+    if (!this.macAddress || this.macAddress == '00:00:00:00:00:00') {
+      snackbarLogLong('Cannot wake ' + this.hostname + ': its MAC address is not known yet. Connect to the host once while it is on.');
+      return Promise.reject('unknown MAC address');
+    }
+    console.log('%c[utils.js, sendWOL]', 'color: gray;', 'Sending WOL request to ' + this.hostname + ' with mac address ' + this.macAddress);
+    return sendMessage('wakeOnLan', [this.macAddress]).then(function () {
+      snackbarLogLong('Wake-on-LAN packet sent to ' + this.hostname + '. It can take up to a minute for the PC to wake up.');
+    }.bind(this), function (error) {
+      snackbarLogLong('Could not send the Wake-on-LAN packet (error ' + error + ')');
+      return Promise.reject(error);
     });
   },
 

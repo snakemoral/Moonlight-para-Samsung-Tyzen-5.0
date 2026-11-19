@@ -57,6 +57,16 @@ ListView.prototype.current = function() {
   return this.func()[this.index];
 }
 
+// Helper for the Add Host dialog: up/down changes the IP part that is selected
+function adjustIpPartValue(view, increment) {
+  var currentId = view.view.current();
+  if (typeof currentId === 'string' && currentId.indexOf('ipPart') === 0) {
+    var digitElement = document.getElementById(currentId);
+    var currentValue = parseInt(digitElement.value, 10) || 0;
+    digitElement.value = (currentValue + increment + 256) % 256;
+  }
+}
+
 function navigateGameCards(offset) { //helper function for Apps view
   var gameCards = Array.from(document.getElementById('game-grid').children);
   var currentIndex = gameCards.indexOf(gameCard);
@@ -66,6 +76,11 @@ function navigateGameCards(offset) { //helper function for Apps view
     gameCard = gameCards[newIndex];
     gameCard.focus();
   }
+}
+
+function isTypingInAddHostField() {
+  var active = document.activeElement;
+  return !!active && active.id === 'manualIPAddress';
 }
 
 var Views = {
@@ -80,15 +95,18 @@ var Views = {
       if (element.id === 'addHostCell') {
         element.click();
       } else {
-        element.children[0].click();
+        element.children[1].click(); // [0] is the host's settings dialog
       }
     },
+    back: function () { showTerminateMoonlightDialog() },
     startBtn: function () {
+      // Opens the host's settings (Wake PC, refresh box art, remove)
       var element = this.view.current();
-      if (element.id != 'addHostCell') {
-        element.children[1].click();
+      if (element.id != 'addHostCell' && element.children[2]) {
+        element.children[2].click();
       }
     },
+    selectBtn: function () { },
     enter: function () { mark(this.view.current()) },
     leave: function () { unmark(this.view.current()) },
   },
@@ -112,17 +130,23 @@ var Views = {
   },
   AddHostDialog: {
     view: new ListView(function () {
-        return [
-          'dialogInputHost', 
-          'continueAddHost', 
-          'cancelAddHost'
-        ];
+      if (document.getElementById('manualInputToggle').checked) {
+        return ['manualInputToggle', 'manualIPAddress', 'continueAddHost', 'cancelAddHost'];
+      } else {
+        return ['manualInputToggle', 'ipPart1', 'ipPart2', 'ipPart3', 'ipPart4', 'continueAddHost', 'cancelAddHost'];
+      }
     }),
-    left: function () { if (this.view.current() !== 'dialogInputHost') {this.view.prev() } },
-    right: function () { if (this.view.current() !== 'dialogInputHost') {this.view.next() } },
-    up: function () { this.view.prev() },
-    down: function () { this.view.next()},
+    // While the user is typing in the text field, left/right move the text cursor
+    left: function () { if (!isTypingInAddHostField()) { this.view.prev() } },
+    right: function () { if (!isTypingInAddHostField()) { this.view.next() } },
+    up: function () {
+      if (document.getElementById('manualInputToggle').checked) { this.view.prev() } else { adjustIpPartValue(this, 1) }
+    },
+    down: function () {
+      if (document.getElementById('manualInputToggle').checked) { this.view.next() } else { adjustIpPartValue(this, -1) }
+    },
     accept: function () { document.getElementById(this.view.current()).click() },
+    selectBtn: function () { document.getElementById('manualInputToggle').click() },
     back: function () { document.getElementById('cancelAddHost').click() },
     enter: function () { mark(this.view.current()) },
     leave: function () { unmark(this.view.current()) },
@@ -195,6 +219,31 @@ var Views = {
     enter: function () { mark(this.view.current()) },
     leave: function () { unmark(this.view.current()) },
   },
+  SettingsDialog: {
+    // hostKey is set by Navigation.push(view, hostKey) and is the host's unique id
+    view: new ListView(function () {
+      var key = Views.SettingsDialog.hostKey;
+      return ['wake-' + key, 'refreshBoxArt-' + key, 'remove-' + key, 'closeSettingsDialog-' + key];
+    }),
+    accept: function () { document.getElementById(this.view.current()).click() },
+    back: function () { document.getElementById('closeSettingsDialog-' + this.hostKey).click() },
+    down: function () { this.view.next() },
+    up: function () { this.view.prev() },
+    enter: function () { mark(this.view.current()) },
+    leave: function () { unmark(this.view.current()) },
+  },
+  TerminateMoonlightDialog: {
+    view: new ListView(function () {
+      return ['exitTerminateMoonlight', 'cancelTerminateMoonlight']
+    }),
+    left: function () { this.view.prev() },
+    right: function () { this.view.next() },
+    down: function () { document.getElementById('exitTerminateMoonlight').focus() },
+    accept: function () { document.getElementById(this.view.current()).click() },
+    back: function () { document.getElementById('cancelTerminateMoonlight').click() },
+    enter: function () { mark(this.view.current()) },
+    leave: function () { unmark(this.view.current()) },
+  },
   AppsNav: {
     view: new ListView(function () {
       return ['backIcon', 'quitCurrentApp']
@@ -257,9 +306,12 @@ var Navigation = (function () {
   var Stack = (function () {
     var viewStack = [];
 
-    function push(view) {
+    function push(view, hostKey) {
       if (get()) {
         get().leave();
+      }
+      if (hostKey !== undefined) {
+        view.hostKey = hostKey; // lets a shared view (e.g. host settings) know which host it is for
       }
       viewStack.push(view);
       get().enter();
@@ -358,6 +410,7 @@ var Navigation = (function () {
     up: runOp('up'),
     down: runOp('down'),
     startBtn: runOp('startBtn'),
+    selectBtn: runOp('selectBtn'),
     push: Stack.push,
     change: Stack.change,
     pop: Stack.pop,

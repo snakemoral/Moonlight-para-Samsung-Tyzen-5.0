@@ -4,6 +4,57 @@ var pairingCert;
 var myUniqueid = '0123456789ABCDEF'; // Use the same UID as other Moonlight clients to allow them to quit each other's games
 var api; // `api` should only be set if we're in a host-specific screen. on the initial screen it should always be null.
 var isInGame = false; // flag indicating whether the game stream started
+var isDialogOpen = false; // track whether the dialog is open
+
+// Shows the TV model, app version and Tizen version at the bottom of the screen.
+// Every lookup is guarded: none of this is critical, so a TV that refuses one of
+// the calls must not break the app.
+function loadProductInfos() {
+  var modelCodePlaceholder = document.getElementById('modelCodePlaceholder');
+  if (!modelCodePlaceholder) {
+    return;
+  }
+
+  var model = 'Not Available';
+  var moonlightVersion = 'Not Available';
+  var tizenVersion = 'Not Available';
+
+  try {
+    model = window.tizen.systeminfo.getCapability('http://tizen.org/system/model_name') || model;
+  } catch (e) {
+    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the TV model', e);
+  }
+  try {
+    moonlightVersion = window.tizen.application.getAppInfo().version || moonlightVersion;
+  } catch (e) {
+    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the app version', e);
+  }
+  try {
+    tizenVersion = window.tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version') || tizenVersion;
+  } catch (e) {
+    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the Tizen version', e);
+  }
+
+  modelCodePlaceholder.innerText = 'TV Model: ' + model + ' ; Moonlight: v' + moonlightVersion + ' ; Tizen: v' + tizenVersion;
+}
+
+// Holding a controller button repeats the action (navigating long lists)
+var repeatAction = null;
+var repeatKey = null;
+var lastInvokeTime = 0;
+var repeatStartTimeout = null;
+var REPEAT_START_DELAY = 350;
+var REPEAT_INTERVAL = 100;
+
+function repeatActionHandler() {
+  if (repeatAction && Date.now() - lastInvokeTime > REPEAT_INTERVAL) {
+    repeatAction();
+    lastInvokeTime = Date.now();
+  }
+  if (repeatAction) {
+    requestAnimationFrame(repeatActionHandler);
+  }
+}
 
 // Called by the common.js module.
 function attachListeners() {
@@ -39,9 +90,6 @@ function attachListeners() {
     var pressed = e.detail.pressed;
     var key = e.detail.key;
 
-    if (!pressed)
-      return;
-
     var gamepadMapping = {
       0: () => Navigation.accept(),
       1: () => Navigation.back(),
@@ -52,8 +100,28 @@ function attachListeners() {
       14: () => Navigation.left(),
       15: () => Navigation.right(),
     };
-    if (gamepadMapping[key]) {
-      gamepadMapping[key]();
+
+    if (pressed) {
+      if (gamepadMapping[key]) {
+        gamepadMapping[key]();
+
+        // Only the directional buttons repeat while held. Accept/back/start/select
+        // must fire once, otherwise holding "A" would keep pressing things.
+        if (key >= 12 && key <= 15) {
+          clearTimeout(repeatStartTimeout);
+          repeatKey = key;
+          repeatAction = gamepadMapping[key];
+          lastInvokeTime = Date.now();
+          repeatStartTimeout = setTimeout(() => {
+            requestAnimationFrame(repeatActionHandler);
+          }, REPEAT_START_DELAY);
+        }
+      }
+    } else if (key === repeatKey) {
+      // Releasing the button that is repeating stops the repeat
+      repeatAction = null;
+      repeatKey = null;
+      clearTimeout(repeatStartTimeout);
     }
   });
 }
@@ -162,6 +230,21 @@ function stopBackgroundPollingOfHost(host) {
   delete activePolls[host.serverUid];
 }
 
+// Saves the host list again when the host's MAC address changed, so that
+// Wake-on-LAN keeps working after the PC's network adapter changes.
+function updateMacAddress(host) {
+  getData('hosts', function (previousValue) {
+    var storedHosts = previousValue.hosts != null ? previousValue.hosts : {};
+    var currentHostUID = host.serverUid;
+    if (host.macAddress && host.macAddress != '00:00:00:00:00:00') {
+      if (storedHosts[currentHostUID] && storedHosts[currentHostUID].macAddress != host.macAddress) {
+        console.log('Updated MAC address for host ' + host.hostname + ' from ' + storedHosts[currentHostUID].macAddress + ' to ' + host.macAddress);
+        saveHosts();
+      }
+    }
+  });
+}
+
 function snackbarLog(givenMessage) {
   console.log('%c[index.js, snackbarLog]', 'color: green;', givenMessage);
   var data = {
@@ -231,7 +314,7 @@ function loadHTTPCertsCb() {
       getData('hosts', function (previousValue) {
         hosts = previousValue.hosts != null ? previousValue.hosts : {};
         for (var hostUID in hosts) { // programmatically add each new host.
-          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress);
+          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress, hosts[hostUID].macAddress);
           revivedHost.serverUid = hosts[hostUID].serverUid;
           revivedHost.externalIP = hosts[hostUID].externalIP;
           revivedHost.hostname = hosts[hostUID].hostname;
@@ -247,6 +330,10 @@ function loadHTTPCertsCb() {
 
 // pair to the given NvHTTP host object.  Returns whether pairing was successful.
 function pairTo(nvhttpHost, onSuccess, onFailure) {
+  if (!onFailure) {
+    onFailure = function () {}; // callers such as "Add Host" don't pass a failure callback
+  }
+
   if (!pairingCert) {
     snackbarLog('ERROR: cert has not been generated yet. Is NaCl initialized?');
     console.warn('%c[index.js]', 'color: green;', 'User wants to pair, and we still have no cert. Problem = very yes.');
@@ -256,7 +343,7 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
 
   nvhttpHost.pollServer(function (ret) {
     if (!nvhttpHost.online) {
-      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
+      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
       console.error('%c[index.js]', 'color: green;', 'Host declared as offline:', nvhttpHost, nvhttpHost.toString()); //Logging both the object and the toString version for text logs
       onFailure();
       return;
@@ -267,15 +354,12 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
       return;
     }
 
-    if (nvhttpHost.currentGame != 0) {
-      snackbarLog(nvhttpHost.hostname + ' is currently in game. Quit the running app or restart the computer, then try again.');
-      onFailure();
-      return;
-    }
-
     var randomNumber = String("0000" + cryptoRand(10000)).slice(-4);
     var pairingDialog = document.querySelector('#pairingDialog');
-    $('#pairingDialogText').html('Please enter the number ' + randomNumber + ' on the GFE dialog on the computer.  This dialog will be dismissed once complete');
+    $('#pairingDialogText').html('Please enter the following PIN on the target PC:  ' + randomNumber + '<br><br>If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>This dialog will close once the pairing is complete.');
+    if (pairingDialog.open) {
+      pairingDialog.close(); // showModal() throws if the dialog is already open
+    }
     pairingDialog.showModal();
     Navigation.push(Views.PairingDialog);
 
@@ -335,6 +419,9 @@ function hostChosen(host) {
 // give the user a dialog to input connection details for the PC
 function addHost() {
   var modal = document.querySelector('#addHostDialog');
+  if (modal.open) {
+    modal.close(); // showModal() throws if the dialog is already open
+  }
   modal.showModal();
   Navigation.push(Views.AddHostDialog);
 
@@ -348,10 +435,39 @@ function addHost() {
   // try to pair if they continue
   $('#continueAddHost').off('click');
   $('#continueAddHost').on('click', function () {
-    var inputHost = $('#dialogInputHost').val();
+    var continueButton = $(this);
+    continueButton.prop('disabled', true); // so users don't send multiple requests
+
+    var inputHost;
+    if ($('#manualInputToggle').prop('checked')) {
+      // Manual input: IP address or hostname typed by the user
+      inputHost = $.trim($('#manualIPAddress').val());
+    } else {
+      // Four selectors, one per IP address part
+      inputHost = [
+        $('#ipPart1').val(),
+        $('#ipPart2').val(),
+        $('#ipPart3').val(),
+        $('#ipPart4').val()
+      ].join('.');
+    }
+
+    if (!inputHost) {
+      snackbarLog('Please enter the IP address or hostname of the host PC');
+      continueButton.prop('disabled', false);
+      return;
+    }
+
     var _nvhttpHost = new NvHTTP(inputHost, myUniqueid, inputHost);
 
     _nvhttpHost.refreshServerInfoAtAddress(inputHost).then(function (success) {
+      if (success === false) {
+        // The address answered, but not like a GameStream/Sunshine host
+        snackbarLog('Failed to connect to ' + inputHost + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
+        continueButton.prop('disabled', false);
+        return;
+      }
+
       modal.close();
       Navigation.pop();
 
@@ -375,9 +491,11 @@ function addHost() {
           saveHosts();
         });
       }
+      continueButton.prop('disabled', false);
     }.bind(this),
       function (failure) {
-        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
+        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
+        continueButton.prop('disabled', false);
       }.bind(this));
   });
 }
@@ -385,7 +503,8 @@ function addHost() {
 
 // host is an NvHTTP object
 function addHostToGrid(host, ismDNSDiscovered) {
-
+  // The card's children, in order: [0] settings dialog, [1] clickable cell,
+  // [2] settings button (not present for mDNS hosts). navigation.js relies on this.
   var outerDiv = $("<div>", {
     class: 'host-container mdl-card mdl-shadow--4dp',
     id: 'host-container-' + host.serverUid,
@@ -401,17 +520,71 @@ function addHostToGrid(host, ismDNSDiscovered) {
     class: "mdl-card__title-text",
     html: host.hostname
   }));
-  var removalButton = $("<div>", {
-    class: "remove-host",
-    id: "removeHostButton-" + host.serverUid,
+  var settingsButton = $("<div>", {
+    class: "host-settings",
+    id: "hostSettingsButton-" + host.serverUid,
     role: 'button',
     tabindex: 0,
-    'aria-label': 'Remove host ' + host.hostname
+    'aria-label': 'Settings ' + host.hostname
   });
-  removalButton.off('click');
-  removalButton.click(function () {
-    removeClicked(host);
+
+  // Per-host settings dialog (Wake-on-LAN, refresh box art, remove host)
+  var settingsDialog = $('<dialog>', {
+    class: 'mdl-dialog',
+    id: "settingsDialog-" + host.serverUid
+  }).appendTo(outerDiv);
+
+  $('<h4>', {
+    class: 'mdl-dialog__title',
+    text: 'Settings ' + host.hostname
+  }).appendTo(settingsDialog);
+
+  var dialogContent = $('<div>', {
+    class: 'mdl-dialog__content'
+  }).appendTo(settingsDialog);
+
+  // Element ids include the host's unique id, so several hosts never clash
+  var options = [ // an array to make it easy to add more options
+    { text: 'Wake PC (WOL)', id: 'wake-' + host.serverUid, action: function () { host.sendWOL().catch(function () {}); } },
+    { text: 'Refresh box art', id: 'refreshBoxArt-' + host.serverUid, action: function () { host.purgeBoxArt().catch(function () {}); } },
+    { text: 'Remove ' + host.hostname, id: 'remove-' + host.serverUid, action: function () { removeClicked(host); } }
+  ];
+
+  options.forEach(function (option) {
+    var button = $('<button>', {
+      class: 'mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect',
+      text: option.text,
+      id: option.id
+    });
+    button.click(function () {
+      Navigation.pop();
+      settingsDialog[0].close();
+      option.action();
+    });
+    button.appendTo(dialogContent);
   });
+
+  $('<button>', {
+    type: 'button',
+    class: 'mdl-button',
+    text: 'Close',
+    id: 'closeSettingsDialog-' + host.serverUid
+  }).click(function () {
+    settingsDialog[0].close();
+    Navigation.pop();
+  }).appendTo($('<div>', {
+    class: 'mdl-dialog__actions'
+  }).appendTo(settingsDialog));
+
+  if (!settingsDialog[0].showModal && window.dialogPolyfill) {
+    dialogPolyfill.registerDialog(settingsDialog[0]);
+  }
+
+  settingsButton.click(function () {
+    settingsDialog[0].showModal();
+    Navigation.push(Views.SettingsDialog, host.serverUid);
+  });
+
   cell.off('click');
   cell.click(function () {
     hostChosen(host);
@@ -423,8 +596,8 @@ function addHostToGrid(host, ismDNSDiscovered) {
   });
   $(outerDiv).append(cell);
   if (!ismDNSDiscovered) {
-    // we don't have the option to delete mDNS hosts.  So don't show it to the user.
-    $(outerDiv).append(removalButton);
+    // we don't have the option to delete or wake mDNS hosts, so don't show it to the user.
+    $(outerDiv).append(settingsButton);
   }
   $('#host-grid').append(outerDiv);
   hosts[host.serverUid] = host;
@@ -457,6 +630,40 @@ function removeClicked(host) {
     saveHosts();
     deleteHostDialog.close();
     Navigation.pop();
+  });
+}
+
+// Asks for confirmation before leaving Moonlight. Opened with the Back button
+// (or the controller's B button) on the hosts screen.
+function showTerminateMoonlightDialog() {
+  var terminateMoonlightDialog = document.querySelector('#terminateMoonlightDialog');
+  if (isDialogOpen) {
+    return;
+  }
+
+  terminateMoonlightDialog.showModal();
+  Navigation.push(Views.TerminateMoonlightDialog);
+  isDialogOpen = true;
+
+  // Close the dialog if the Cancel button is pressed
+  $('#cancelTerminateMoonlight').off('click');
+  $('#cancelTerminateMoonlight').on('click', function () {
+    terminateMoonlightDialog.close();
+    isDialogOpen = false;
+    Navigation.pop();
+  });
+
+  // Terminate the application if the Exit button is pressed
+  $('#exitTerminateMoonlight').off('click');
+  $('#exitTerminateMoonlight').on('click', function () {
+    terminateMoonlightDialog.close();
+    isDialogOpen = false;
+    Navigation.pop();
+    try {
+      tizen.application.getCurrentApplication().exit();
+    } catch (e) {
+      console.error('%c[index.js, showTerminateMoonlightDialog]', 'color: green;', 'Could not exit the application', e);
+    }
   });
 }
 
@@ -1107,6 +1314,7 @@ function onWindowLoad() {
   console.log('%c[index.js]', 'color: green;', 'Moonlight\'s main window loaded');
   // don't show the game selection div
   $('#gameSelection').css('display', 'none');
+  loadProductInfos();
   console.log('load stored resolution prefs');
   getData('resolution', function (previousValue) {
     if (previousValue.resolution != null) {

@@ -24,8 +24,8 @@
         <nav class="mdl-navigation">
           <div class="nav-menu-parent">
             <div id="resolutionMenu">
-              <button id="selectResolution" data-value="1280:720" class="mdl-button mdl-js-button">
-                                720p
+              <button id="selectResolution" data-value="1920:1080" class="mdl-button mdl-js-button">
+                                1080p
                             </button>
             </div>
 
@@ -60,11 +60,11 @@
 
           <div class="nav-menu-parent">
             <div id="bandwidthMenu">
-              <button id="bitrateField" class="mdl-button">10 Mbps</button>
+              <button id="bitrateField" class="mdl-button">20 Mbps</button>
             </div>
 
             <div class="bitrateMenu mdl-menu mdl-js-menu mdl-js-ripple-effect" for="bandwidthMenu">
-              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="10">
+              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="20">
             </div>
 
             <div id="bandwidthTooltip" class="mdl-tooltip" for="bandwidthMenu">
@@ -126,6 +126,7 @@
       <div id="naclSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
         <h5 id="naclSpinnerMessage"></h5>
       </div>
+      <div id="modelCodePlaceholder"></div>
     </main>
   </div>
   <script defer src="static/js/jquery-2.2.0.min.js"></script>
@@ -142,7 +143,10 @@
     <h3 class="mdl-dialog__title">Pairing</h3>
     <div class="mdl-dialog__content">
       <p id="pairingDialogText">
-        Please enter the number XXXX on the GFE dialog on the computer. This dialog will be dismissed once complete
+        Please enter the following PIN on the target PC: XXXX<br><br>
+        If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>
+        Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>
+        This dialog will close once the pairing is complete.
       </p>
     </div>
     <div class="mdl-dialog__actions">
@@ -177,8 +181,17 @@
     <h3 class="mdl-dialog__title">Add Host Manually</h3>
     <div class="mdl-dialog__content">
       <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-        <input class="mdl-textfield__input" type="text" id="dialogInputHost" />
-        <label class="mdl-textfield__label" for="dialogInputHost">IP Address or Hostname of GeForce PC</label>
+        <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="manualInputToggle">
+          <input type="checkbox" id="manualInputToggle" class="mdl-checkbox__input" onchange="toggleManualInput()">
+          <span class="mdl-checkbox__label">Enter IP or hostname manually (press Select)</span>
+        </label>
+        <div id="manualInput" style="display: none;">
+          <input type="text" id="manualIPAddress" class="mdl-textfield__input hovered" placeholder="Enter host IP address or hostname">
+        </div>
+        <select id="ipPart1" name="ipPart1" style="width: 50px;" tabindex="-1"></select>
+        <select id="ipPart2" name="ipPart2" style="width: 50px;" tabindex="-1"></select>
+        <select id="ipPart3" name="ipPart3" style="width: 50px;" tabindex="-1"></select>
+        <select id="ipPart4" name="ipPart4" style="width: 50px;" tabindex="-1"></select>
       </div>
     </div>
     <div class="mdl-dialog__actions">
@@ -186,10 +199,59 @@
       <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="continueAddHost">Continue</button>
     </div>
   </dialog>
+  <dialog id="terminateMoonlightDialog" class="mdl-dialog">
+    <h3 class="mdl-dialog__title">Exit Moonlight</h3>
+    <div class="mdl-dialog__content">
+      <p id="terminateMoonlightDialogText">
+        Are you sure you want to exit Moonlight?
+      </p>
+    </div>
+    <div class="mdl-dialog__actions">
+      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="cancelTerminateMoonlight">Cancel</button>
+      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="exitTerminateMoonlight">Exit</button>
+    </div>
+  </dialog>
   <div id="snackbar" class="mdl-snackbar mdl-js-snackbar">
     <div class="mdl-snackbar__text"></div>
     <button id="snackButton" class="mdl-snackbar__action" type="button"></button>
     <!-- this button exists to suppress the snackbar warning. we're really using a toast. -->
   </div>
+  <script>
+    // Host IP entry: four 0-255 selectors (navigated with up/down on the remote)
+    var ipParts = [
+      { element: 'ipPart1', selectedValue: 192 },
+      { element: 'ipPart2', selectedValue: 168 },
+      { element: 'ipPart3' },
+      { element: 'ipPart4' }
+    ];
+
+    function populateSelect(element, start, end, selectedValue) {
+      for (var i = start; i <= end; i++) {
+        var option = document.createElement('option');
+        option.value = i;
+        option.text = i;
+        if (i === selectedValue) {
+          option.selected = true;
+        }
+        element.appendChild(option);
+      }
+    }
+
+    ipParts.forEach(function (ipPart) {
+      populateSelect(document.getElementById(ipPart.element), 0, 255, ipPart.selectedValue);
+    });
+
+    function toggleManualInput() {
+      var manualInputToggle = document.getElementById('manualInputToggle');
+      var manualInputDiv = document.getElementById('manualInput');
+      var displayStyle = manualInputToggle.checked ? 'none' : 'inline-block';
+
+      manualInputDiv.style.display = manualInputToggle.checked ? 'block' : 'none';
+
+      ipParts.forEach(function (ipPart) {
+        document.getElementById(ipPart.element).style.display = displayStyle;
+      });
+    }
+  </script>
 </body>
 </html>

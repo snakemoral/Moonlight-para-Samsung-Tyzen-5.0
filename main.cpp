@@ -182,6 +182,8 @@ void MoonlightInstance::HandleMessage(const pp::Var& var_message) {
         HandlePair(callbackId, params);
     } else if (strcmp(method.c_str(), "STUN") == 0) {
         HandleSTUN(callbackId, params);
+    } else if (strcmp(method.c_str(), "wakeOnLan") == 0) {
+        HandleWakeOnLan(callbackId, params);
     } else {
         pp::Var response("Unhandled message received: " + method);
         PostMessage(response);
@@ -331,6 +333,101 @@ void MoonlightInstance::STUNCallback(int32_t /*result*/, int32_t callbackId, pp:
         ret.Set("ret", pp::Var(addrStr));
     } else {
         ret.Set("ret", pp::Var());
+    }
+
+    PostMessage(ret);
+}
+
+// ---------------------------------------------------------------------------
+// Wake-on-LAN
+// ---------------------------------------------------------------------------
+
+// Builds a Wake-on-LAN "magic packet" (6 x 0xFF followed by the MAC address
+// repeated 16 times) for a MAC address written as "AA:BB:CC:DD:EE:FF".
+// Returns false if the MAC address is not valid.
+static bool BuildWakeOnLanPacket(const std::string& macAddress, unsigned char packet[102]) {
+    unsigned int parts[6];
+    char trailing;
+
+    // The trailing %c makes sure there is nothing after the sixth byte
+    if (sscanf(macAddress.c_str(), "%2x:%2x:%2x:%2x:%2x:%2x%c",
+               &parts[0], &parts[1], &parts[2], &parts[3], &parts[4], &parts[5], &trailing) != 6) {
+        return false;
+    }
+
+    unsigned char mac[6];
+    for (int i = 0; i < 6; i++) {
+        mac[i] = (unsigned char)parts[i];
+    }
+
+    memset(packet, 0xFF, 6);
+    for (int i = 1; i <= 16; i++) {
+        memcpy(&packet[i * 6], mac, 6);
+    }
+    return true;
+}
+
+// Broadcasts the magic packet over UDP (ports 9 and 7, the two commonly used).
+// Returns 0 if at least one packet was sent, otherwise a non-zero error code.
+static int SendWakeOnLanPacket(const unsigned char* packet, size_t length) {
+    int udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udpSocket < 0) {
+        return -1;
+    }
+
+#ifdef SO_BROADCAST
+    // Not every socket layer supports this option. If it is refused we still
+    // try to send, since some of them allow broadcasting anyway.
+    int broadcast = 1;
+    setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
+#endif
+
+    static const unsigned short ports[] = {9, 7};
+    int sent = 0;
+
+    for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+        addr.sin_port = htons(ports[i]);
+
+        int sentBytes = (int)sendto(udpSocket, packet, length, 0, (struct sockaddr*)&addr, sizeof(addr));
+        if (sentBytes == (int)length) {
+            sent++;
+        }
+    }
+
+    close(udpSocket);
+    return sent > 0 ? 0 : -2;
+}
+
+void MoonlightInstance::HandleWakeOnLan(int32_t callbackId, pp::VarArray args) {
+    // Sockets must not be used from the main thread, so do it on a worker
+    // thread, like the HTTP, pairing and STUN requests.
+    m_HttpThreadPool[m_HttpThreadPoolSequence++ % HTTP_HANDLER_THREADS]->message_loop().PostWork(
+        m_CallbackFactory.NewCallback(&MoonlightInstance::WakeOnLanCallback, callbackId, args));
+}
+
+void MoonlightInstance::WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args) {
+    unsigned char packet[102];
+    int err;
+
+    if (!BuildWakeOnLanPacket(args.Get(0).AsString(), packet)) {
+        err = -3; // invalid MAC address
+    } else {
+        err = SendWakeOnLanPacket(packet, sizeof(packet));
+    }
+
+    pp::VarDictionary ret;
+    ret.Set("callbackId", pp::Var(callbackId));
+    if (err == 0) {
+        ret.Set("type", pp::Var("resolve"));
+        ret.Set("ret", pp::VarDictionary());
+    }
+    else {
+        ret.Set("type", pp::Var("reject"));
+        ret.Set("ret", pp::Var(err));
     }
 
     PostMessage(ret);

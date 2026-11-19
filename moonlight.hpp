@@ -100,8 +100,10 @@ class MoonlightInstance : public pp::Instance, public pp::MouseLock {
         void HandleStopStream(int32_t callbackId, pp::VarArray args);
         void HandleOpenURL(int32_t callbackId, pp::VarArray args);
         void HandleSTUN(int32_t callbackId, pp::VarArray args);
+        void HandleWakeOnLan(int32_t callbackId, pp::VarArray args);
         void PairCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
         void STUNCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
+        void WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
     
         bool TryHandleNativeTouchEvent(const pp::InputEvent& event);
         bool HandleInputEvent(const pp::InputEvent& event);
