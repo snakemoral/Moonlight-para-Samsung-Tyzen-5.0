@@ -102,6 +102,15 @@
             </div>
           </div>
 
+          <div class="nav-menu-parent">
+            <button type="button" id="gamepadTestBtn" class="mdl-button mdl-js-button mdl-button--icon" aria-label="Controller test">
+              <i class="material-icons">gamepad</i>
+            </button>
+            <div id="gamepadTestTooltip" class="mdl-tooltip" for="gamepadTestBtn">
+              Controller test (blue button on the remote)
+            </div>
+          </div>
+
           <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="quitCurrentApp" aria-label="Quit current app">
                         <i class="material-icons">remove_circle_outline</i>
                         Quit Current App
@@ -197,6 +206,17 @@
     <div class="mdl-dialog__actions">
       <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="cancelAddHost">Cancel</button>
       <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="continueAddHost">Continue</button>
+    </div>
+  </dialog>
+  <dialog id="gamepadTestDialog" class="mdl-dialog" style="width:80%;max-width:900px;">
+    <h3 class="mdl-dialog__title">Controller test</h3>
+    <div class="mdl-dialog__content">
+      <p>Press any button on the controller (the TV only lists a controller after a button press).</p>
+      <pre id="gamepadTestOutput" style="font-size:16px;line-height:1.3;white-space:pre-wrap;"></pre>
+    </div>
+    <div class="mdl-dialog__actions">
+      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="vibrateGamepadTest">Vibrate</button>
+      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="closeGamepadTest">Close</button>
     </div>
   </dialog>
   <dialog id="terminateMoonlightDialog" class="mdl-dialog">

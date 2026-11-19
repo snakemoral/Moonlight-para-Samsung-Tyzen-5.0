@@ -1391,3 +1391,141 @@ window.addEventListener('gamepaddisconnected', function (event) {
     JSON.stringify(event.gamepad),
     event.gamepad);
 });
+
+// ---------------------------------------------------------------------------
+// Controller test screen: shows what the TV's browser (used by the menus) and
+// the native plugin (used while streaming) each see, to find out why a
+// controller doesn't work.
+// ---------------------------------------------------------------------------
+var gamepadTestTimer = null;
+var gamepadTestEvents = [];
+
+function gamepadTestLog(text) {
+  gamepadTestEvents.push(new Date().toLocaleTimeString() + ' ' + text);
+  if (gamepadTestEvents.length > 6) {
+    gamepadTestEvents.shift();
+  }
+}
+
+window.addEventListener('gamepadconnected', function (e) {
+  gamepadTestLog('connected: #' + e.gamepad.index + ' ' + e.gamepad.id);
+});
+window.addEventListener('gamepaddisconnected', function (e) {
+  gamepadTestLog('disconnected: #' + e.gamepad.index);
+});
+window.addEventListener('gamepadbuttonpressed', function (e) {
+  if (e.detail.pressed) {
+    gamepadTestLog('app received button ' + e.detail.key);
+  }
+});
+
+function describeJsGamepads() {
+  var lines = [];
+  var list = [];
+  try {
+    list = navigator.getGamepads ? navigator.getGamepads() :
+      (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
+  } catch (e) {
+    return ['navigator.getGamepads error: ' + e];
+  }
+  var found = 0;
+  for (var i = 0; list && i < list.length; i++) {
+    var g = list[i];
+    if (!g) { continue; }
+    found++;
+    var pressed = [];
+    for (var b = 0; b < g.buttons.length; b++) {
+      var v = g.buttons[b];
+      if (v && (v.pressed || v.value > 0.5)) { pressed.push(b); }
+    }
+    var axes = [];
+    for (var a = 0; a < g.axes.length; a++) { axes.push(g.axes[a].toFixed(2)); }
+    lines.push('#' + g.index + ' "' + g.id + '"');
+    lines.push('   mapping="' + g.mapping + '" connected=' + g.connected +
+      ' buttons=' + g.buttons.length + ' axes=' + g.axes.length +
+      ' vibration=' + (g.vibrationActuator ? 'yes' : 'no'));
+    lines.push('   pressed: [' + pressed.join(' ') + ']  axes: [' + axes.join(' ') + ']');
+  }
+  if (!found) {
+    lines.push('(none listed - press a button on the controller)');
+  }
+  return lines;
+}
+
+function refreshGamepadTest(nativeLines) {
+  var out = document.getElementById('gamepadTestOutput');
+  if (!out) { return; }
+  var text = 'BROWSER (menus):\n' + describeJsGamepads().join('\n') +
+    '\n\nNATIVE (streaming):\n' + (nativeLines || ['(waiting...)']).join('\n') +
+    '\n\nEVENTS:\n' + (gamepadTestEvents.length ? gamepadTestEvents.join('\n') : '(none yet)');
+  out.textContent = text;
+}
+
+function pollNativeGamepads() {
+  var nativeLines = [];
+  var done = function () { refreshGamepadTest(nativeLines); };
+  try {
+    sendMessage('gamepadInfo', []).then(function (pads) {
+      var seen = 0;
+      (pads || []).forEach(function (p, i) {
+        if (!p.connected) { return; }
+        seen++;
+        nativeLines.push('#' + i + ' connected buttons=' + p.buttons + ' axes=' + p.axes +
+          ' pressed: [' + p.pressed + ']');
+      });
+      if (!seen) {
+        nativeLines.push('(no controller reported by the plugin)');
+      }
+      done();
+    }, function (err) {
+      nativeLines.push('plugin error: ' + err);
+      done();
+    });
+  } catch (e) {
+    nativeLines.push('plugin not ready: ' + e);
+    done();
+  }
+}
+
+function showGamepadTestDialog() {
+  var dialog = document.querySelector('#gamepadTestDialog');
+  if (isDialogOpen || !dialog) {
+    return;
+  }
+  dialog.showModal();
+  Navigation.push(Views.GamepadTestDialog);
+  isDialogOpen = true;
+  refreshGamepadTest();
+  pollNativeGamepads();
+  gamepadTestTimer = setInterval(pollNativeGamepads, 150);
+
+  $('#vibrateGamepadTest').off('click').on('click', function () {
+    try {
+      var list = navigator.getGamepads();
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].vibrationActuator) {
+          list[i].vibrationActuator.playEffect('dual-rumble', {
+            duration: 500, strongMagnitude: 1.0, weakMagnitude: 1.0 });
+          gamepadTestLog('vibration sent to #' + i);
+          return;
+        }
+      }
+      gamepadTestLog('no controller with vibration support');
+    } catch (e) {
+      gamepadTestLog('vibration error: ' + e);
+    }
+  });
+
+  $('#closeGamepadTest').off('click').on('click', function () {
+    clearInterval(gamepadTestTimer);
+    gamepadTestTimer = null;
+    dialog.close();
+    isDialogOpen = false;
+    Navigation.pop();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('gamepadTestBtn');
+  if (btn) { btn.addEventListener('click', showGamepadTestDialog); }
+});

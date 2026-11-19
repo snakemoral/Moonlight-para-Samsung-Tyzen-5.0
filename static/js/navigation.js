@@ -119,6 +119,7 @@ var Views = {
         'externalAudioBtn',
         'mouseLockBtn',
         'optimizeGamesBtn',
+        'gamepadTestBtn',
       ];
     }),
     left: function () { this.view.prev() },
@@ -229,6 +230,17 @@ var Views = {
     back: function () { document.getElementById('closeSettingsDialog-' + this.hostKey).click() },
     down: function () { this.view.next() },
     up: function () { this.view.prev() },
+    enter: function () { mark(this.view.current()) },
+    leave: function () { unmark(this.view.current()) },
+  },
+  GamepadTestDialog: {
+    view: new ListView(function () {
+      return ['vibrateGamepadTest', 'closeGamepadTest'];
+    }),
+    left: function () { this.view.prev() },
+    right: function () { this.view.next() },
+    accept: function () { document.getElementById(this.view.current()).click() },
+    back: function () { document.getElementById('closeGamepadTest').click() },
     enter: function () { mark(this.view.current()) },
     leave: function () { unmark(this.view.current()) },
   },

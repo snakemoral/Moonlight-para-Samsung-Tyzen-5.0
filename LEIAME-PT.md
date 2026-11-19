@@ -21,6 +21,7 @@ O vídeo e o áudio continuam usando o plugin NaCl, igual ao app que você já i
 | **Textos do pareamento com Sunshine** | PIN e instruções para o Sunshine e para o GeForce Experience |
 | **Padrão 1080p, 60 FPS, 20 Mbps** | Só vale quando ainda não há configuração salva |
 | **Destaque visual do item selecionado** | Botões e campos ganham contorno azul |
+| **Teste de controle** | Ícone de gamepad no topo, ou botão **azul** do controle remoto da TV. Mostra o que a TV e o plugin enxergam do controle |
 
 Correções feitas no caminho:
 
@@ -114,5 +115,4 @@ Se a execução ficar vermelha, abra o passo que falhou e copie as últimas linh
 - **Não testado na TV real**, e **não compilado com o toolchain da Samsung**. O cache de capas e o
   Wake-on-LAN dependem do firmware da TV e podem se comportar diferente.
 
-As diferenças em relação ao fork original estão no histórico do Git: o primeiro commit é o código
-original e o segundo contém todas as mudanças deste port.
+As diferenças em relação ao fork original estão no histórico do Git.

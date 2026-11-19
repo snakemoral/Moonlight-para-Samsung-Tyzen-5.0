@@ -184,6 +184,8 @@ void MoonlightInstance::HandleMessage(const pp::Var& var_message) {
         HandleSTUN(callbackId, params);
     } else if (strcmp(method.c_str(), "wakeOnLan") == 0) {
         HandleWakeOnLan(callbackId, params);
+    } else if (strcmp(method.c_str(), "gamepadInfo") == 0) {
+        HandleGamepadInfo(callbackId, params);
     } else {
         pp::Var response("Unhandled message received: " + method);
         PostMessage(response);
@@ -430,6 +432,48 @@ void MoonlightInstance::WakeOnLanCallback(int32_t /*result*/, int32_t callbackId
         ret.Set("ret", pp::Var(err));
     }
 
+    PostMessage(ret);
+}
+
+// Reports what the plugin's gamepad interface sees right now. This is the
+// interface used while streaming, so the controller test screen shows it next
+// to what the TV's browser reports (used by the menus).
+void MoonlightInstance::HandleGamepadInfo(int32_t callbackId, pp::VarArray args) {
+    pp::VarArray pads;
+
+    if (m_GamepadApi) {
+        PP_GamepadsSampleData gamepadData;
+        m_GamepadApi->Sample(pp_instance(), &gamepadData);
+
+        pads.SetLength(gamepadData.length);
+        for (unsigned int p = 0; p < gamepadData.length; p++) {
+            const PP_GamepadSampleData& padData = gamepadData.items[p];
+
+            // Buttons pressed right now, written like "0 3 12"
+            std::string pressed;
+            for (unsigned int i = 0; i < padData.buttons_length; i++) {
+                if (padData.buttons[i] > 0.5f) {
+                    if (!pressed.empty()) {
+                        pressed += " ";
+                    }
+                    pressed += std::to_string(i);
+                }
+            }
+
+            pp::VarDictionary pad;
+            pad.Set("connected", pp::Var(padData.connected == PP_TRUE));
+            pad.Set("timestamp", pp::Var((double)padData.timestamp));
+            pad.Set("buttons", pp::Var((int32_t)padData.buttons_length));
+            pad.Set("axes", pp::Var((int32_t)padData.axes_length));
+            pad.Set("pressed", pp::Var(pressed));
+            pads.Set(p, pad);
+        }
+    }
+
+    pp::VarDictionary ret;
+    ret.Set("callbackId", pp::Var(callbackId));
+    ret.Set("type", pp::Var("resolve"));
+    ret.Set("ret", pads);
     PostMessage(ret);
 }
 

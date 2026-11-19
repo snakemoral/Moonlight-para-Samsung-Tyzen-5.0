@@ -39,23 +39,28 @@ var Controller = (function() {
   }
 
   function gamepadDisconnected(gamepad) {
-    delete gamepad[gamepad.index];
+    delete gamepads[gamepad.index];
   }
 
   function analyzeGamepad(gamepad) {
     var index = gamepad.index;
     var pGamepad = gamepads[index];
 
-    if (pGamepad) {
-      pGamepad.analyzeButtons(gamepad.buttons);
+    if (!pGamepad) {
+      // Some TV browsers list a controller without ever firing "gamepadconnected"
+      // (or fire it before we were listening): start tracking it anyway.
+      gamepadConnected(gamepad);
+      return;
     }
+
+    pGamepad.analyzeButtons(gamepad.buttons);
   }
 
   function pollGamepads() {
     var gamepads =
         navigator.getGamepads ?
           navigator.getGamepads() :
-          (navigator.webkitGetGamepads ? navigator.webkitGetGamepads : []);
+          (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
 
     if (!gamepads) {
       return;
@@ -145,6 +150,12 @@ function remoteControllerHandler(e) {
           break;
       case tvKey.KEY_GREEN:
           Navigation.startBtn();
+          break;
+      case tvKey.KEY_BLUE:
+          // Controller test screen (not while streaming)
+          if (!isInGame) {
+              showGamepadTestDialog();
+          }
           break;
   }
 }

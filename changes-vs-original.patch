@@ -1,0 +1,2348 @@
+diff --git a/changes-vs-original.patch b/changes-vs-original.patch
+new file mode 100644
+index 0000000..c5f536c
+--- /dev/null
++++ b/changes-vs-original.patch
+@@ -0,0 +1,1171 @@
++diff --git a/config.xml b/config.xml
++index 6d8aa39..b1c1385 100644
++--- a/config.xml
+++++ b/config.xml
++@@ -1,5 +1,5 @@
++ <?xml version="1.0" encoding="UTF-8"?>
++-<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="http://yourdomain/MoonlightNaCl" version="0.0.1" viewmodes="maximized">
+++<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="http://yourdomain/MoonlightNaCl" version="0.1.0" viewmodes="maximized">
++     <access origin="*" subdomains="true"></access>
++     <tizen:application id="ChqHQExU28.MoonlightNaCl" package="ChqHQExU28" required_version="3.0"/>
++     <content src="index.html"/>
++@@ -16,6 +16,10 @@
++     <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
++     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
++     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+++    <!-- Used by the box art cache (app private storage). If the app fails to install on your TV,
+++         remove these two lines: everything keeps working, only the cache is lost. -->
+++    <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
+++    <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
++     <tizen:profile name="tv-samsung"/>
++     <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
++ </widget>
++diff --git a/index.html b/index.html
++index b758169..4556c14 100644
++--- a/index.html
+++++ b/index.html
++@@ -24,8 +24,8 @@
++         <nav class="mdl-navigation">
++           <div class="nav-menu-parent">
++             <div id="resolutionMenu">
++-              <button id="selectResolution" data-value="1280:720" class="mdl-button mdl-js-button">
++-                                720p
+++              <button id="selectResolution" data-value="1920:1080" class="mdl-button mdl-js-button">
+++                                1080p
++                             </button>
++             </div>
++ 
++@@ -60,11 +60,11 @@
++ 
++           <div class="nav-menu-parent">
++             <div id="bandwidthMenu">
++-              <button id="bitrateField" class="mdl-button">10 Mbps</button>
+++              <button id="bitrateField" class="mdl-button">20 Mbps</button>
++             </div>
++ 
++             <div class="bitrateMenu mdl-menu mdl-js-menu mdl-js-ripple-effect" for="bandwidthMenu">
++-              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="10">
+++              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="20">
++             </div>
++ 
++             <div id="bandwidthTooltip" class="mdl-tooltip" for="bandwidthMenu">
++@@ -126,6 +126,7 @@
++       <div id="naclSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
++         <h5 id="naclSpinnerMessage"></h5>
++       </div>
+++      <div id="modelCodePlaceholder"></div>
++     </main>
++   </div>
++   <script defer src="static/js/jquery-2.2.0.min.js"></script>
++@@ -142,7 +143,10 @@
++     <h3 class="mdl-dialog__title">Pairing</h3>
++     <div class="mdl-dialog__content">
++       <p id="pairingDialogText">
++-        Please enter the number XXXX on the GFE dialog on the computer. This dialog will be dismissed once complete
+++        Please enter the following PIN on the target PC: XXXX<br><br>
+++        If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>
+++        Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>
+++        This dialog will close once the pairing is complete.
++       </p>
++     </div>
++     <div class="mdl-dialog__actions">
++@@ -177,8 +181,17 @@
++     <h3 class="mdl-dialog__title">Add Host Manually</h3>
++     <div class="mdl-dialog__content">
++       <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
++-        <input class="mdl-textfield__input" type="text" id="dialogInputHost" />
++-        <label class="mdl-textfield__label" for="dialogInputHost">IP Address or Hostname of GeForce PC</label>
+++        <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="manualInputToggle">
+++          <input type="checkbox" id="manualInputToggle" class="mdl-checkbox__input" onchange="toggleManualInput()">
+++          <span class="mdl-checkbox__label">Enter IP or hostname manually (press Select)</span>
+++        </label>
+++        <div id="manualInput" style="display: none;">
+++          <input type="text" id="manualIPAddress" class="mdl-textfield__input hovered" placeholder="Enter host IP address or hostname">
+++        </div>
+++        <select id="ipPart1" name="ipPart1" style="width: 50px;" tabindex="-1"></select>
+++        <select id="ipPart2" name="ipPart2" style="width: 50px;" tabindex="-1"></select>
+++        <select id="ipPart3" name="ipPart3" style="width: 50px;" tabindex="-1"></select>
+++        <select id="ipPart4" name="ipPart4" style="width: 50px;" tabindex="-1"></select>
++       </div>
++     </div>
++     <div class="mdl-dialog__actions">
++@@ -186,10 +199,59 @@
++       <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="continueAddHost">Continue</button>
++     </div>
++   </dialog>
+++  <dialog id="terminateMoonlightDialog" class="mdl-dialog">
+++    <h3 class="mdl-dialog__title">Exit Moonlight</h3>
+++    <div class="mdl-dialog__content">
+++      <p id="terminateMoonlightDialogText">
+++        Are you sure you want to exit Moonlight?
+++      </p>
+++    </div>
+++    <div class="mdl-dialog__actions">
+++      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="cancelTerminateMoonlight">Cancel</button>
+++      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="exitTerminateMoonlight">Exit</button>
+++    </div>
+++  </dialog>
++   <div id="snackbar" class="mdl-snackbar mdl-js-snackbar">
++     <div class="mdl-snackbar__text"></div>
++     <button id="snackButton" class="mdl-snackbar__action" type="button"></button>
++     <!-- this button exists to suppress the snackbar warning. we're really using a toast. -->
++   </div>
+++  <script>
+++    // Host IP entry: four 0-255 selectors (navigated with up/down on the remote)
+++    var ipParts = [
+++      { element: 'ipPart1', selectedValue: 192 },
+++      { element: 'ipPart2', selectedValue: 168 },
+++      { element: 'ipPart3' },
+++      { element: 'ipPart4' }
+++    ];
+++
+++    function populateSelect(element, start, end, selectedValue) {
+++      for (var i = start; i <= end; i++) {
+++        var option = document.createElement('option');
+++        option.value = i;
+++        option.text = i;
+++        if (i === selectedValue) {
+++          option.selected = true;
+++        }
+++        element.appendChild(option);
+++      }
+++    }
+++
+++    ipParts.forEach(function (ipPart) {
+++      populateSelect(document.getElementById(ipPart.element), 0, 255, ipPart.selectedValue);
+++    });
+++
+++    function toggleManualInput() {
+++      var manualInputToggle = document.getElementById('manualInputToggle');
+++      var manualInputDiv = document.getElementById('manualInput');
+++      var displayStyle = manualInputToggle.checked ? 'none' : 'inline-block';
+++
+++      manualInputDiv.style.display = manualInputToggle.checked ? 'block' : 'none';
+++
+++      ipParts.forEach(function (ipPart) {
+++        document.getElementById(ipPart.element).style.display = displayStyle;
+++      });
+++    }
+++  </script>
++ </body>
++ </html>
++\ No newline at end of file
++diff --git a/main.cpp b/main.cpp
++index 3e0f89d..3878dba 100644
++--- a/main.cpp
+++++ b/main.cpp
++@@ -182,6 +182,8 @@ void MoonlightInstance::HandleMessage(const pp::Var& var_message) {
++         HandlePair(callbackId, params);
++     } else if (strcmp(method.c_str(), "STUN") == 0) {
++         HandleSTUN(callbackId, params);
+++    } else if (strcmp(method.c_str(), "wakeOnLan") == 0) {
+++        HandleWakeOnLan(callbackId, params);
++     } else {
++         pp::Var response("Unhandled message received: " + method);
++         PostMessage(response);
++@@ -336,6 +338,101 @@ void MoonlightInstance::STUNCallback(int32_t /*result*/, int32_t callbackId, pp:
++     PostMessage(ret);
++ }
++ 
+++// ---------------------------------------------------------------------------
+++// Wake-on-LAN
+++// ---------------------------------------------------------------------------
+++
+++// Builds a Wake-on-LAN "magic packet" (6 x 0xFF followed by the MAC address
+++// repeated 16 times) for a MAC address written as "AA:BB:CC:DD:EE:FF".
+++// Returns false if the MAC address is not valid.
+++static bool BuildWakeOnLanPacket(const std::string& macAddress, unsigned char packet[102]) {
+++    unsigned int parts[6];
+++    char trailing;
+++
+++    // The trailing %c makes sure there is nothing after the sixth byte
+++    if (sscanf(macAddress.c_str(), "%2x:%2x:%2x:%2x:%2x:%2x%c",
+++               &parts[0], &parts[1], &parts[2], &parts[3], &parts[4], &parts[5], &trailing) != 6) {
+++        return false;
+++    }
+++
+++    unsigned char mac[6];
+++    for (int i = 0; i < 6; i++) {
+++        mac[i] = (unsigned char)parts[i];
+++    }
+++
+++    memset(packet, 0xFF, 6);
+++    for (int i = 1; i <= 16; i++) {
+++        memcpy(&packet[i * 6], mac, 6);
+++    }
+++    return true;
+++}
+++
+++// Broadcasts the magic packet over UDP (ports 9 and 7, the two commonly used).
+++// Returns 0 if at least one packet was sent, otherwise a non-zero error code.
+++static int SendWakeOnLanPacket(const unsigned char* packet, size_t length) {
+++    int udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+++    if (udpSocket < 0) {
+++        return -1;
+++    }
+++
+++#ifdef SO_BROADCAST
+++    // Not every socket layer supports this option. If it is refused we still
+++    // try to send, since some of them allow broadcasting anyway.
+++    int broadcast = 1;
+++    setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
+++#endif
+++
+++    static const unsigned short ports[] = {9, 7};
+++    int sent = 0;
+++
+++    for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
+++        struct sockaddr_in addr;
+++        memset(&addr, 0, sizeof(addr));
+++        addr.sin_family = AF_INET;
+++        addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+++        addr.sin_port = htons(ports[i]);
+++
+++        int sentBytes = (int)sendto(udpSocket, packet, length, 0, (struct sockaddr*)&addr, sizeof(addr));
+++        if (sentBytes == (int)length) {
+++            sent++;
+++        }
+++    }
+++
+++    close(udpSocket);
+++    return sent > 0 ? 0 : -2;
+++}
+++
+++void MoonlightInstance::HandleWakeOnLan(int32_t callbackId, pp::VarArray args) {
+++    // Sockets must not be used from the main thread, so do it on a worker
+++    // thread, like the HTTP, pairing and STUN requests.
+++    m_HttpThreadPool[m_HttpThreadPoolSequence++ % HTTP_HANDLER_THREADS]->message_loop().PostWork(
+++        m_CallbackFactory.NewCallback(&MoonlightInstance::WakeOnLanCallback, callbackId, args));
+++}
+++
+++void MoonlightInstance::WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args) {
+++    unsigned char packet[102];
+++    int err;
+++
+++    if (!BuildWakeOnLanPacket(args.Get(0).AsString(), packet)) {
+++        err = -3; // invalid MAC address
+++    } else {
+++        err = SendWakeOnLanPacket(packet, sizeof(packet));
+++    }
+++
+++    pp::VarDictionary ret;
+++    ret.Set("callbackId", pp::Var(callbackId));
+++    if (err == 0) {
+++        ret.Set("type", pp::Var("resolve"));
+++        ret.Set("ret", pp::VarDictionary());
+++    }
+++    else {
+++        ret.Set("type", pp::Var("reject"));
+++        ret.Set("ret", pp::Var(err));
+++    }
+++
+++    PostMessage(ret);
+++}
+++
++ bool MoonlightInstance::Init(uint32_t argc,
++                              const char* argn[],
++                              const char* argv[]) {
++diff --git a/moonlight.hpp b/moonlight.hpp
++index 2fc5e60..8f71275 100644
++--- a/moonlight.hpp
+++++ b/moonlight.hpp
++@@ -100,8 +100,10 @@ class MoonlightInstance : public pp::Instance, public pp::MouseLock {
++         void HandleStopStream(int32_t callbackId, pp::VarArray args);
++         void HandleOpenURL(int32_t callbackId, pp::VarArray args);
++         void HandleSTUN(int32_t callbackId, pp::VarArray args);
+++        void HandleWakeOnLan(int32_t callbackId, pp::VarArray args);
++         void PairCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
++         void STUNCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
+++        void WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
++     
++         bool TryHandleNativeTouchEvent(const pp::InputEvent& event);
++         bool HandleInputEvent(const pp::InputEvent& event);
++diff --git a/static/css/style.css b/static/css/style.css
++index e6ce8c5..c22e4a0 100644
++--- a/static/css/style.css
+++++ b/static/css/style.css
++@@ -329,4 +329,78 @@ main {
++ }
++ #nacl_module {
++     cursor: none;
++-}
++\ No newline at end of file
+++}
+++/* ---------------------------------------------------------------------------
+++   Styles ported from the current Moonlight for Tizen (WASM) app
+++   --------------------------------------------------------------------------- */
+++
+++/* Per-host settings button (replaces the old "remove host" icon) */
+++.host-settings {
+++    position: absolute;
+++    right: 5px;
+++    top: 5px;
+++    width: 24px;
+++    height: 24px;
+++    z-index: 5;
+++    background-image: url('../res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg');
+++    background-repeat: no-repeat;
+++    background-size: 20px 20px;
+++    background-position: center;
+++    border: 0;
+++    cursor: pointer;
+++}
+++
+++/* Clear highlight for whatever the remote/controller has selected */
+++#continueAddHost:focus, #cancelAddHost:focus,
+++#continueDeleteHost:focus, #cancelDeleteHost:focus,
+++#cancelPairingDialog:focus,
+++#backIcon:focus, #quitCurrentApp:focus,
+++#continueQuitApp:focus, #cancelQuitApp:focus,
+++#exitTerminateMoonlight:focus, #cancelTerminateMoonlight:focus,
+++.mdl-icon-toggle:focus, .mdl-button:focus {
+++    background-color: #404354;
+++    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
+++}
+++#ipPart1.hovered, #ipPart2.hovered, #ipPart3.hovered, #ipPart4.hovered {
+++    background-color: #404354;
+++    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
+++    color: white;
+++}
+++.mdl-textfield__input.hovered {
+++    background-color: #404354;
+++}
+++
+++/* TV model / app version / Tizen version, bottom left */
+++#modelCodePlaceholder {
+++    position: fixed;
+++    bottom: 1cm;
+++    left: 1cm;
+++    font-size: 12px;
+++}
+++
+++/* Host settings dialog: one full-width button per action */
+++dialog[id^="settingsDialog-"] .mdl-dialog__content {
+++    display: flex;
+++    flex-direction: column;
+++    align-items: stretch;
+++}
+++dialog[id^="settingsDialog-"] .mdl-dialog__content button {
+++    margin-bottom: 10px;
+++    width: 100%;
+++}
+++dialog[id^="settingsDialog-"] .mdl-dialog__actions button {
+++    width: 100%;
+++}
+++
+++/* Add Host dialog: IP address selectors */
+++#addHostDialog .mdl-textfield {
+++    width: 100%;
+++}
+++#addHostDialog select {
+++    background-color: #333846;
+++    color: white;
+++    font-size: 1.2rem;
+++}
+++#manualIPAddress {
+++    width: 100%;
+++}
++diff --git a/static/js/index.js b/static/js/index.js
++index fcd30b5..5127099 100644
++--- a/static/js/index.js
+++++ b/static/js/index.js
++@@ -4,6 +4,57 @@ var pairingCert;
++ var myUniqueid = '0123456789ABCDEF'; // Use the same UID as other Moonlight clients to allow them to quit each other's games
++ var api; // `api` should only be set if we're in a host-specific screen. on the initial screen it should always be null.
++ var isInGame = false; // flag indicating whether the game stream started
+++var isDialogOpen = false; // track whether the dialog is open
+++
+++// Shows the TV model, app version and Tizen version at the bottom of the screen.
+++// Every lookup is guarded: none of this is critical, so a TV that refuses one of
+++// the calls must not break the app.
+++function loadProductInfos() {
+++  var modelCodePlaceholder = document.getElementById('modelCodePlaceholder');
+++  if (!modelCodePlaceholder) {
+++    return;
+++  }
+++
+++  var model = 'Not Available';
+++  var moonlightVersion = 'Not Available';
+++  var tizenVersion = 'Not Available';
+++
+++  try {
+++    model = window.tizen.systeminfo.getCapability('http://tizen.org/system/model_name') || model;
+++  } catch (e) {
+++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the TV model', e);
+++  }
+++  try {
+++    moonlightVersion = window.tizen.application.getAppInfo().version || moonlightVersion;
+++  } catch (e) {
+++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the app version', e);
+++  }
+++  try {
+++    tizenVersion = window.tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version') || tizenVersion;
+++  } catch (e) {
+++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the Tizen version', e);
+++  }
+++
+++  modelCodePlaceholder.innerText = 'TV Model: ' + model + ' ; Moonlight: v' + moonlightVersion + ' ; Tizen: v' + tizenVersion;
+++}
+++
+++// Holding a controller button repeats the action (navigating long lists)
+++var repeatAction = null;
+++var repeatKey = null;
+++var lastInvokeTime = 0;
+++var repeatStartTimeout = null;
+++var REPEAT_START_DELAY = 350;
+++var REPEAT_INTERVAL = 100;
+++
+++function repeatActionHandler() {
+++  if (repeatAction && Date.now() - lastInvokeTime > REPEAT_INTERVAL) {
+++    repeatAction();
+++    lastInvokeTime = Date.now();
+++  }
+++  if (repeatAction) {
+++    requestAnimationFrame(repeatActionHandler);
+++  }
+++}
++ 
++ // Called by the common.js module.
++ function attachListeners() {
++@@ -39,9 +90,6 @@ function attachListeners() {
++     var pressed = e.detail.pressed;
++     var key = e.detail.key;
++ 
++-    if (!pressed)
++-      return;
++-
++     var gamepadMapping = {
++       0: () => Navigation.accept(),
++       1: () => Navigation.back(),
++@@ -52,8 +100,28 @@ function attachListeners() {
++       14: () => Navigation.left(),
++       15: () => Navigation.right(),
++     };
++-    if (gamepadMapping[key]) {
++-      gamepadMapping[key]();
+++
+++    if (pressed) {
+++      if (gamepadMapping[key]) {
+++        gamepadMapping[key]();
+++
+++        // Only the directional buttons repeat while held. Accept/back/start/select
+++        // must fire once, otherwise holding "A" would keep pressing things.
+++        if (key >= 12 && key <= 15) {
+++          clearTimeout(repeatStartTimeout);
+++          repeatKey = key;
+++          repeatAction = gamepadMapping[key];
+++          lastInvokeTime = Date.now();
+++          repeatStartTimeout = setTimeout(() => {
+++            requestAnimationFrame(repeatActionHandler);
+++          }, REPEAT_START_DELAY);
+++        }
+++      }
+++    } else if (key === repeatKey) {
+++      // Releasing the button that is repeating stops the repeat
+++      repeatAction = null;
+++      repeatKey = null;
+++      clearTimeout(repeatStartTimeout);
++     }
++   });
++ }
++@@ -162,6 +230,21 @@ function stopBackgroundPollingOfHost(host) {
++   delete activePolls[host.serverUid];
++ }
++ 
+++// Saves the host list again when the host's MAC address changed, so that
+++// Wake-on-LAN keeps working after the PC's network adapter changes.
+++function updateMacAddress(host) {
+++  getData('hosts', function (previousValue) {
+++    var storedHosts = previousValue.hosts != null ? previousValue.hosts : {};
+++    var currentHostUID = host.serverUid;
+++    if (host.macAddress && host.macAddress != '00:00:00:00:00:00') {
+++      if (storedHosts[currentHostUID] && storedHosts[currentHostUID].macAddress != host.macAddress) {
+++        console.log('Updated MAC address for host ' + host.hostname + ' from ' + storedHosts[currentHostUID].macAddress + ' to ' + host.macAddress);
+++        saveHosts();
+++      }
+++    }
+++  });
+++}
+++
++ function snackbarLog(givenMessage) {
++   console.log('%c[index.js, snackbarLog]', 'color: green;', givenMessage);
++   var data = {
++@@ -231,7 +314,7 @@ function loadHTTPCertsCb() {
++       getData('hosts', function (previousValue) {
++         hosts = previousValue.hosts != null ? previousValue.hosts : {};
++         for (var hostUID in hosts) { // programmatically add each new host.
++-          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress);
+++          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress, hosts[hostUID].macAddress);
++           revivedHost.serverUid = hosts[hostUID].serverUid;
++           revivedHost.externalIP = hosts[hostUID].externalIP;
++           revivedHost.hostname = hosts[hostUID].hostname;
++@@ -247,6 +330,10 @@ function loadHTTPCertsCb() {
++ 
++ // pair to the given NvHTTP host object.  Returns whether pairing was successful.
++ function pairTo(nvhttpHost, onSuccess, onFailure) {
+++  if (!onFailure) {
+++    onFailure = function () {}; // callers such as "Add Host" don't pass a failure callback
+++  }
+++
++   if (!pairingCert) {
++     snackbarLog('ERROR: cert has not been generated yet. Is NaCl initialized?');
++     console.warn('%c[index.js]', 'color: green;', 'User wants to pair, and we still have no cert. Problem = very yes.');
++@@ -256,7 +343,7 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
++ 
++   nvhttpHost.pollServer(function (ret) {
++     if (!nvhttpHost.online) {
++-      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
+++      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
++       console.error('%c[index.js]', 'color: green;', 'Host declared as offline:', nvhttpHost, nvhttpHost.toString()); //Logging both the object and the toString version for text logs
++       onFailure();
++       return;
++@@ -267,15 +354,12 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
++       return;
++     }
++ 
++-    if (nvhttpHost.currentGame != 0) {
++-      snackbarLog(nvhttpHost.hostname + ' is currently in game. Quit the running app or restart the computer, then try again.');
++-      onFailure();
++-      return;
++-    }
++-
++     var randomNumber = String("0000" + cryptoRand(10000)).slice(-4);
++     var pairingDialog = document.querySelector('#pairingDialog');
++-    $('#pairingDialogText').html('Please enter the number ' + randomNumber + ' on the GFE dialog on the computer.  This dialog will be dismissed once complete');
+++    $('#pairingDialogText').html('Please enter the following PIN on the target PC:  ' + randomNumber + '<br><br>If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>This dialog will close once the pairing is complete.');
+++    if (pairingDialog.open) {
+++      pairingDialog.close(); // showModal() throws if the dialog is already open
+++    }
++     pairingDialog.showModal();
++     Navigation.push(Views.PairingDialog);
++ 
++@@ -335,6 +419,9 @@ function hostChosen(host) {
++ // give the user a dialog to input connection details for the PC
++ function addHost() {
++   var modal = document.querySelector('#addHostDialog');
+++  if (modal.open) {
+++    modal.close(); // showModal() throws if the dialog is already open
+++  }
++   modal.showModal();
++   Navigation.push(Views.AddHostDialog);
++ 
++@@ -348,10 +435,39 @@ function addHost() {
++   // try to pair if they continue
++   $('#continueAddHost').off('click');
++   $('#continueAddHost').on('click', function () {
++-    var inputHost = $('#dialogInputHost').val();
+++    var continueButton = $(this);
+++    continueButton.prop('disabled', true); // so users don't send multiple requests
+++
+++    var inputHost;
+++    if ($('#manualInputToggle').prop('checked')) {
+++      // Manual input: IP address or hostname typed by the user
+++      inputHost = $.trim($('#manualIPAddress').val());
+++    } else {
+++      // Four selectors, one per IP address part
+++      inputHost = [
+++        $('#ipPart1').val(),
+++        $('#ipPart2').val(),
+++        $('#ipPart3').val(),
+++        $('#ipPart4').val()
+++      ].join('.');
+++    }
+++
+++    if (!inputHost) {
+++      snackbarLog('Please enter the IP address or hostname of the host PC');
+++      continueButton.prop('disabled', false);
+++      return;
+++    }
+++
++     var _nvhttpHost = new NvHTTP(inputHost, myUniqueid, inputHost);
++ 
++     _nvhttpHost.refreshServerInfoAtAddress(inputHost).then(function (success) {
+++      if (success === false) {
+++        // The address answered, but not like a GameStream/Sunshine host
+++        snackbarLog('Failed to connect to ' + inputHost + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
+++        continueButton.prop('disabled', false);
+++        return;
+++      }
+++
++       modal.close();
++       Navigation.pop();
++ 
++@@ -375,9 +491,11 @@ function addHost() {
++           saveHosts();
++         });
++       }
+++      continueButton.prop('disabled', false);
++     }.bind(this),
++       function (failure) {
++-        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
+++        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
+++        continueButton.prop('disabled', false);
++       }.bind(this));
++   });
++ }
++@@ -385,7 +503,8 @@ function addHost() {
++ 
++ // host is an NvHTTP object
++ function addHostToGrid(host, ismDNSDiscovered) {
++-
+++  // The card's children, in order: [0] settings dialog, [1] clickable cell,
+++  // [2] settings button (not present for mDNS hosts). navigation.js relies on this.
++   var outerDiv = $("<div>", {
++     class: 'host-container mdl-card mdl-shadow--4dp',
++     id: 'host-container-' + host.serverUid,
++@@ -401,17 +520,71 @@ function addHostToGrid(host, ismDNSDiscovered) {
++     class: "mdl-card__title-text",
++     html: host.hostname
++   }));
++-  var removalButton = $("<div>", {
++-    class: "remove-host",
++-    id: "removeHostButton-" + host.serverUid,
+++  var settingsButton = $("<div>", {
+++    class: "host-settings",
+++    id: "hostSettingsButton-" + host.serverUid,
++     role: 'button',
++     tabindex: 0,
++-    'aria-label': 'Remove host ' + host.hostname
+++    'aria-label': 'Settings ' + host.hostname
++   });
++-  removalButton.off('click');
++-  removalButton.click(function () {
++-    removeClicked(host);
+++
+++  // Per-host settings dialog (Wake-on-LAN, refresh box art, remove host)
+++  var settingsDialog = $('<dialog>', {
+++    class: 'mdl-dialog',
+++    id: "settingsDialog-" + host.serverUid
+++  }).appendTo(outerDiv);
+++
+++  $('<h4>', {
+++    class: 'mdl-dialog__title',
+++    text: 'Settings ' + host.hostname
+++  }).appendTo(settingsDialog);
+++
+++  var dialogContent = $('<div>', {
+++    class: 'mdl-dialog__content'
+++  }).appendTo(settingsDialog);
+++
+++  // Element ids include the host's unique id, so several hosts never clash
+++  var options = [ // an array to make it easy to add more options
+++    { text: 'Wake PC (WOL)', id: 'wake-' + host.serverUid, action: function () { host.sendWOL().catch(function () {}); } },
+++    { text: 'Refresh box art', id: 'refreshBoxArt-' + host.serverUid, action: function () { host.purgeBoxArt().catch(function () {}); } },
+++    { text: 'Remove ' + host.hostname, id: 'remove-' + host.serverUid, action: function () { removeClicked(host); } }
+++  ];
+++
+++  options.forEach(function (option) {
+++    var button = $('<button>', {
+++      class: 'mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect',
+++      text: option.text,
+++      id: option.id
+++    });
+++    button.click(function () {
+++      Navigation.pop();
+++      settingsDialog[0].close();
+++      option.action();
+++    });
+++    button.appendTo(dialogContent);
++   });
+++
+++  $('<button>', {
+++    type: 'button',
+++    class: 'mdl-button',
+++    text: 'Close',
+++    id: 'closeSettingsDialog-' + host.serverUid
+++  }).click(function () {
+++    settingsDialog[0].close();
+++    Navigation.pop();
+++  }).appendTo($('<div>', {
+++    class: 'mdl-dialog__actions'
+++  }).appendTo(settingsDialog));
+++
+++  if (!settingsDialog[0].showModal && window.dialogPolyfill) {
+++    dialogPolyfill.registerDialog(settingsDialog[0]);
+++  }
+++
+++  settingsButton.click(function () {
+++    settingsDialog[0].showModal();
+++    Navigation.push(Views.SettingsDialog, host.serverUid);
+++  });
+++
++   cell.off('click');
++   cell.click(function () {
++     hostChosen(host);
++@@ -423,8 +596,8 @@ function addHostToGrid(host, ismDNSDiscovered) {
++   });
++   $(outerDiv).append(cell);
++   if (!ismDNSDiscovered) {
++-    // we don't have the option to delete mDNS hosts.  So don't show it to the user.
++-    $(outerDiv).append(removalButton);
+++    // we don't have the option to delete or wake mDNS hosts, so don't show it to the user.
+++    $(outerDiv).append(settingsButton);
++   }
++   $('#host-grid').append(outerDiv);
++   hosts[host.serverUid] = host;
++@@ -460,6 +633,40 @@ function removeClicked(host) {
++   });
++ }
++ 
+++// Asks for confirmation before leaving Moonlight. Opened with the Back button
+++// (or the controller's B button) on the hosts screen.
+++function showTerminateMoonlightDialog() {
+++  var terminateMoonlightDialog = document.querySelector('#terminateMoonlightDialog');
+++  if (isDialogOpen) {
+++    return;
+++  }
+++
+++  terminateMoonlightDialog.showModal();
+++  Navigation.push(Views.TerminateMoonlightDialog);
+++  isDialogOpen = true;
+++
+++  // Close the dialog if the Cancel button is pressed
+++  $('#cancelTerminateMoonlight').off('click');
+++  $('#cancelTerminateMoonlight').on('click', function () {
+++    terminateMoonlightDialog.close();
+++    isDialogOpen = false;
+++    Navigation.pop();
+++  });
+++
+++  // Terminate the application if the Exit button is pressed
+++  $('#exitTerminateMoonlight').off('click');
+++  $('#exitTerminateMoonlight').on('click', function () {
+++    terminateMoonlightDialog.close();
+++    isDialogOpen = false;
+++    Navigation.pop();
+++    try {
+++      tizen.application.getCurrentApplication().exit();
+++    } catch (e) {
+++      console.error('%c[index.js, showTerminateMoonlightDialog]', 'color: green;', 'Could not exit the application', e);
+++    }
+++  });
+++}
+++
++ // puts the CSS style for current app on the app that's currently running
++ // and puts the CSS style for non-current app apps that aren't running
++ // this requires a hot-off-the-host `api`, and the appId we're going to stylize
++@@ -1107,6 +1314,7 @@ function onWindowLoad() {
++   console.log('%c[index.js]', 'color: green;', 'Moonlight\'s main window loaded');
++   // don't show the game selection div
++   $('#gameSelection').css('display', 'none');
+++  loadProductInfos();
++   console.log('load stored resolution prefs');
++   getData('resolution', function (previousValue) {
++     if (previousValue.resolution != null) {
++diff --git a/static/js/navigation.js b/static/js/navigation.js
++index bcd7ee7..83079c5 100644
++--- a/static/js/navigation.js
+++++ b/static/js/navigation.js
++@@ -57,6 +57,16 @@ ListView.prototype.current = function() {
++   return this.func()[this.index];
++ }
++ 
+++// Helper for the Add Host dialog: up/down changes the IP part that is selected
+++function adjustIpPartValue(view, increment) {
+++  var currentId = view.view.current();
+++  if (typeof currentId === 'string' && currentId.indexOf('ipPart') === 0) {
+++    var digitElement = document.getElementById(currentId);
+++    var currentValue = parseInt(digitElement.value, 10) || 0;
+++    digitElement.value = (currentValue + increment + 256) % 256;
+++  }
+++}
+++
++ function navigateGameCards(offset) { //helper function for Apps view
++   var gameCards = Array.from(document.getElementById('game-grid').children);
++   var currentIndex = gameCards.indexOf(gameCard);
++@@ -68,6 +78,11 @@ function navigateGameCards(offset) { //helper function for Apps view
++   }
++ }
++ 
+++function isTypingInAddHostField() {
+++  var active = document.activeElement;
+++  return !!active && active.id === 'manualIPAddress';
+++}
+++
++ var Views = {
++   Hosts: {
++     view: new ListView(() => document.getElementById('host-grid').children),
++@@ -80,15 +95,18 @@ var Views = {
++       if (element.id === 'addHostCell') {
++         element.click();
++       } else {
++-        element.children[0].click();
+++        element.children[1].click(); // [0] is the host's settings dialog
++       }
++     },
+++    back: function () { showTerminateMoonlightDialog() },
++     startBtn: function () {
+++      // Opens the host's settings (Wake PC, refresh box art, remove)
++       var element = this.view.current();
++-      if (element.id != 'addHostCell') {
++-        element.children[1].click();
+++      if (element.id != 'addHostCell' && element.children[2]) {
+++        element.children[2].click();
++       }
++     },
+++    selectBtn: function () { },
++     enter: function () { mark(this.view.current()) },
++     leave: function () { unmark(this.view.current()) },
++   },
++@@ -112,17 +130,23 @@ var Views = {
++   },
++   AddHostDialog: {
++     view: new ListView(function () {
++-        return [
++-          'dialogInputHost', 
++-          'continueAddHost', 
++-          'cancelAddHost'
++-        ];
+++      if (document.getElementById('manualInputToggle').checked) {
+++        return ['manualInputToggle', 'manualIPAddress', 'continueAddHost', 'cancelAddHost'];
+++      } else {
+++        return ['manualInputToggle', 'ipPart1', 'ipPart2', 'ipPart3', 'ipPart4', 'continueAddHost', 'cancelAddHost'];
+++      }
++     }),
++-    left: function () { if (this.view.current() !== 'dialogInputHost') {this.view.prev() } },
++-    right: function () { if (this.view.current() !== 'dialogInputHost') {this.view.next() } },
++-    up: function () { this.view.prev() },
++-    down: function () { this.view.next()},
+++    // While the user is typing in the text field, left/right move the text cursor
+++    left: function () { if (!isTypingInAddHostField()) { this.view.prev() } },
+++    right: function () { if (!isTypingInAddHostField()) { this.view.next() } },
+++    up: function () {
+++      if (document.getElementById('manualInputToggle').checked) { this.view.prev() } else { adjustIpPartValue(this, 1) }
+++    },
+++    down: function () {
+++      if (document.getElementById('manualInputToggle').checked) { this.view.next() } else { adjustIpPartValue(this, -1) }
+++    },
++     accept: function () { document.getElementById(this.view.current()).click() },
+++    selectBtn: function () { document.getElementById('manualInputToggle').click() },
++     back: function () { document.getElementById('cancelAddHost').click() },
++     enter: function () { mark(this.view.current()) },
++     leave: function () { unmark(this.view.current()) },
++@@ -195,6 +219,31 @@ var Views = {
++     enter: function () { mark(this.view.current()) },
++     leave: function () { unmark(this.view.current()) },
++   },
+++  SettingsDialog: {
+++    // hostKey is set by Navigation.push(view, hostKey) and is the host's unique id
+++    view: new ListView(function () {
+++      var key = Views.SettingsDialog.hostKey;
+++      return ['wake-' + key, 'refreshBoxArt-' + key, 'remove-' + key, 'closeSettingsDialog-' + key];
+++    }),
+++    accept: function () { document.getElementById(this.view.current()).click() },
+++    back: function () { document.getElementById('closeSettingsDialog-' + this.hostKey).click() },
+++    down: function () { this.view.next() },
+++    up: function () { this.view.prev() },
+++    enter: function () { mark(this.view.current()) },
+++    leave: function () { unmark(this.view.current()) },
+++  },
+++  TerminateMoonlightDialog: {
+++    view: new ListView(function () {
+++      return ['exitTerminateMoonlight', 'cancelTerminateMoonlight']
+++    }),
+++    left: function () { this.view.prev() },
+++    right: function () { this.view.next() },
+++    down: function () { document.getElementById('exitTerminateMoonlight').focus() },
+++    accept: function () { document.getElementById(this.view.current()).click() },
+++    back: function () { document.getElementById('cancelTerminateMoonlight').click() },
+++    enter: function () { mark(this.view.current()) },
+++    leave: function () { unmark(this.view.current()) },
+++  },
++   AppsNav: {
++     view: new ListView(function () {
++       return ['backIcon', 'quitCurrentApp']
++@@ -257,10 +306,13 @@ var Navigation = (function () {
++   var Stack = (function () {
++     var viewStack = [];
++ 
++-    function push(view) {
+++    function push(view, hostKey) {
++       if (get()) {
++         get().leave();
++       }
+++      if (hostKey !== undefined) {
+++        view.hostKey = hostKey; // lets a shared view (e.g. host settings) know which host it is for
+++      }
++       viewStack.push(view);
++       get().enter();
++     }
++@@ -358,6 +410,7 @@ var Navigation = (function () {
++     up: runOp('up'),
++     down: runOp('down'),
++     startBtn: runOp('startBtn'),
+++    selectBtn: runOp('selectBtn'),
++     push: Stack.push,
++     change: Stack.change,
++     pop: Stack.pop,
++diff --git a/static/js/utils.js b/static/js/utils.js
++index 7bff1d4..e0d8183 100644
++--- a/static/js/utils.js
+++++ b/static/js/utils.js
++@@ -90,9 +90,10 @@ String.prototype.toHex = function() {
++   return hex;
++ }
++ 
++-function NvHTTP (address, clientUid, userEnteredAddress) {
+++function NvHTTP (address, clientUid, userEnteredAddress, macAddress) {
++   console.log('%c[utils.js, NvHTTP Object]', 'color: gray;', this);
++   this.address = address;
+++  this.macAddress = macAddress; // used by Wake-on-LAN
++   this.ppkstr = null;
++   this.paired = false;
++   this.currentGame = 0;
++@@ -217,6 +218,7 @@ NvHTTP.prototype = {
++       // as online initially
++       if (this.paired && this._pollCount++ % 10 == 1) {
++         this.getAppListWithCacheFlush();
+++        updateMacAddress(this); // keep the stored MAC address (used by Wake-on-LAN) up to date
++       }
++ 
++       this._consecutivePollFailures = 0;
++@@ -267,6 +269,7 @@ NvHTTP.prototype = {
++     var string = '';
++     string += 'server address: ' + this.address + '\r\n';
++     string += 'server UID: ' + this.serverUid + '\r\n';
+++    string += 'mac address: ' + this.macAddress + '\r\n';
++     string += 'is paired: ' + this.paired + '\r\n';
++     string += 'current game: ' + this.currentGame + '\r\n';
++     string += 'server major version: ' + this.serverMajorVersion + '\r\n';
++@@ -302,6 +305,12 @@ NvHTTP.prototype = {
++     this.serverMajorVersion = parseInt(this.appVersion.substring(0, 1), 10);
++     this.serverUid = $root.find('uniqueid').text().trim();
++     this.hostname = $root.find('hostname').text().trim();
+++    // Hosts report 00:00:00:00:00:00 when they don't know their MAC address.
+++    // Never replace a good stored address with that.
+++    var reportedMac = $root.find('mac').text().trim();
+++    if (reportedMac && reportedMac != '00:00:00:00:00:00') {
+++      this.macAddress = reportedMac;
+++    }
++ 
++     var externIP = $root.find('ExternalIP').text().trim();
++     if (externIP) {
++@@ -417,72 +426,156 @@ NvHTTP.prototype = {
++ 
++   // returns the box art of the given appID.
++   // three layers of response time are possible: memory cached (in javascript), storage cached (in chrome.storage.local), and streamed (host sends binary over the network)
++-  getBoxArt: function (appId) {
++-    // if (chrome.storage) {
++-    //   // This may be bad practice to push/pull this much data through local storage?
++-    //   return new Promise(function(resolve, reject) {
++-    //     chrome.storage.local.get('boxart-' + appId, function(storageData) {
++-    //       // if we already have it, load it.
++-    //       if (storageData !== undefined && Object.keys(storageData).length !== 0 && storageData['boxart-' + appId].constructor !== Object) {
++-    //         console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
++-    //         resolve(storageData['boxart-' + appId]);
++-    //         return;
++-    //       }
++-
++-    //       // otherwise, put it in our cache, then return it
++-    //       sendMessage('openUrl', [
++-    //         this._baseUrlHttps +
++-    //         '/appasset?' + this._buildUidStr() +
++-    //         '&appid=' + appId +
++-    //         '&AssetType=2&AssetIdx=0',
++-    //         this.ppkstr,
++-    //         true
++-    //       ]).then(function(boxArtBuffer) {
++-    //         var reader = new FileReader();
++-    //         reader.onloadend = function() {
++-    //           var obj = {};
++-    //           obj['boxart-' + appId] = this.result;
++-    //           chrome.storage.local.set(obj, function(onSuccess) {});
++-    //           console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
++-    //           resolve(this.result);
++-    //         }
++-    //         reader.readAsDataURL(new Blob([boxArtBuffer], {
++-    //           type: "image/png"
++-    //         }));
++-    //       }.bind(this), function(error) {
++-    //         console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
++-    //         reject(error);
++-    //         return;
++-    //       }.bind(this));
++-    //     }.bind(this));
++-    //   }.bind(this));
++-
++-    // } else { // shouldn't run because we always have chrome.storage, but I'm not going to antagonize other browsers
++-    console.warn('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'chrome.storage not detected! Box art will not be saved!');
++-    return new Promise((resolve, reject) => {
++-      sendMessage('openUrl', [
++-        this._baseUrlHttps +
++-        '/appasset?' + this._buildUidStr() +
++-        '&appid=' + appId +
++-        '&AssetType=2&AssetIdx=0',
++-        this.ppkstr,
++-        true
++-      ]).then((boxArtBuffer) => {
++-        var reader = new FileReader();
++-        reader.onloadend = function () {
++-          var obj = {};
++-          obj['boxart-' + appId] = this.result;
++-          console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
++-          resolve(this.result);
+++  // ---------------------------------------------------------------------------
+++  // Box art cache
+++  //
+++  // Box art is kept in the app's private storage so the app list does not have
+++  // to download every image from the host each time it is opened. Every storage
+++  // access is wrapped in try/catch: if this TV refuses it (or the API is not
+++  // available on this firmware) we silently fall back to downloading the image,
+++  // exactly like the previous version did.
+++  // ---------------------------------------------------------------------------
+++
+++  // Folder name (inside wgt-private) used for this host's box art
+++  _boxArtDirName: function () {
+++    var id = this.serverUid || this.hostname || 'host';
+++    return 'boxart-' + String(id).replace(/[^A-Za-z0-9_-]/g, '_');
+++  },
+++
+++  // "Refresh box art" bumps this number, which makes every cached file stale
+++  _boxArtGeneration: function () {
+++    try {
+++      return parseInt(window.localStorage.getItem('boxArtGen-' + this.serverUid), 10) || 0;
+++    } catch (e) {
+++      return 0;
+++    }
+++  },
+++
+++  // Creates the host's box art folder if it does not exist yet. Never rejects:
+++  // if it fails, the later read/write attempts fail too and we use the network.
+++  _ensureBoxArtDir: function () {
+++    var dirName = this._boxArtDirName();
+++    this._boxArtDirPromises = this._boxArtDirPromises || {};
+++    if (!this._boxArtDirPromises[dirName]) {
+++      this._boxArtDirPromises[dirName] = new Promise(function (resolve) {
+++        try {
+++          tizen.filesystem.resolve('wgt-private', function (root) {
+++            try {
+++              root.resolve(dirName);
+++            } catch (notFound) {
+++              try {
+++                root.createDirectory(dirName);
+++              } catch (createError) {
+++                console.warn('%c[utils.js, _ensureBoxArtDir]', 'color: gray;', 'Could not create box art folder', createError);
+++              }
+++            }
+++            resolve();
+++          }, function () {
+++            resolve();
+++          }, 'rw');
+++        } catch (e) {
+++          resolve();
++         }
++-        reader.readAsDataURL(new Blob([boxArtBuffer], {
++-          type: "image/png"
++-        }));
++-      }, (error) => {
++-        console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
++-        reject(error);
++-        return;
++       });
+++    }
+++    return this._boxArtDirPromises[dirName];
+++  },
+++
+++  getBoxArt: function (appId) {
+++    return this._ensureBoxArtDir().then(function () {
+++      return new Promise(function (resolve, reject) {
+++        var boxArtFilePath = 'wgt-private/' + this._boxArtDirName() +
+++          '/boxart-' + appId + '-g' + this._boxArtGeneration();
+++
+++        var fetchFromNetwork = function () {
+++          sendMessage('openUrl', [
+++            this._baseUrlHttps +
+++            '/appasset?' + this._buildUidStr() +
+++            '&appid=' + appId +
+++            '&AssetType=2&AssetIdx=0',
+++            this.ppkstr,
+++            true
+++          ]).then(function (boxArtBuffer) {
+++            var reader = new FileReader();
+++            reader.onloadend = function () {
+++              var dataUrl = reader.result;
+++              try {
+++                var writeHandle = tizen.filesystem.openFile(boxArtFilePath, 'w', true);
+++                writeHandle.writeData(new Uint8Array(boxArtBuffer));
+++                writeHandle.close();
+++              } catch (writeError) {
+++                // Not fatal: we still have the image, it just won't be cached
+++                console.warn('%c[utils.js, getBoxArt]', 'color: gray;', 'Could not cache box art', writeError);
+++              }
+++              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
+++              resolve(dataUrl);
+++            };
+++            reader.readAsDataURL(new Blob([boxArtBuffer], {
+++              type: 'image/png'
+++            }));
+++          }, function (error) {
+++            console.error('%c[utils.js, getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
+++            reject(error);
+++          });
+++        }.bind(this);
+++
+++        // 1) Cache hit?
+++        try {
+++          var readHandle = tizen.filesystem.openFile(boxArtFilePath, 'r');
+++          var cachedBlob = readHandle.readBlob();
+++          readHandle.close();
+++
+++          var cachedReader = new FileReader();
+++          cachedReader.onloadend = function () {
+++            // A tiny result means an empty/corrupt file: download it again
+++            if (cachedReader.result && cachedReader.result.length > 100) {
+++              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
+++              resolve(cachedReader.result);
+++            } else {
+++              fetchFromNetwork();
+++            }
+++          };
+++          // The stored file has no type: tag it as an image so the data URL is correct
+++          cachedReader.readAsDataURL(new Blob([cachedBlob], { type: 'image/png' }));
+++          return;
+++        } catch (notCached) {
+++          // Not cached yet (or storage unavailable): use the network
+++        }
+++
+++        // 2) Download and (try to) cache
+++        fetchFromNetwork();
+++      }.bind(this));
+++    }.bind(this));
+++  },
+++
+++  // Makes every cached image stale, so they are downloaded again next time
+++  purgeBoxArt: function () {
+++    return new Promise(function (resolve, reject) {
+++      try {
+++        window.localStorage.setItem('boxArtGen-' + this.serverUid, String(this._boxArtGeneration() + 1));
+++        console.log('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Box art cache invalidated for host:', this.hostname);
+++        snackbarLog('Box art will be downloaded again the next time you open the apps list');
+++        resolve();
+++      } catch (e) {
+++        console.error('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Failed to invalidate the box art cache!', e);
+++        snackbarLog('Could not refresh box art');
+++        reject(e);
+++      }
+++    }.bind(this));
+++  },
+++
+++  // Wake-on-LAN: the magic packet is sent by the native module
+++  sendWOL: function () {
+++    if (!this.macAddress || this.macAddress == '00:00:00:00:00:00') {
+++      snackbarLogLong('Cannot wake ' + this.hostname + ': its MAC address is not known yet. Connect to the host once while it is on.');
+++      return Promise.reject('unknown MAC address');
+++    }
+++    console.log('%c[utils.js, sendWOL]', 'color: gray;', 'Sending WOL request to ' + this.hostname + ' with mac address ' + this.macAddress);
+++    return sendMessage('wakeOnLan', [this.macAddress]).then(function () {
+++      snackbarLogLong('Wake-on-LAN packet sent to ' + this.hostname + '. It can take up to a minute for the PC to wake up.');
+++    }.bind(this), function (error) {
+++      snackbarLogLong('Could not send the Wake-on-LAN packet (error ' + error + ')');
+++      return Promise.reject(error);
++     });
++   },
++ 
++diff --git a/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg b/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg
++new file mode 100644
++index 0000000..fcbf17e
++--- /dev/null
+++++ b/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg
++@@ -0,0 +1 @@
+++<svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 -960 960 960" width="48px" fill="#e8eaed"><path d="M120-240v-60h720v60H120Zm0-210v-60h720v60H120Zm0-210v-60h720v60H120Z"/></svg>
++\ No newline at end of file
+diff --git a/config.xml b/config.xml
+index 6d8aa39..b1c1385 100644
+--- a/config.xml
++++ b/config.xml
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+-<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="http://yourdomain/MoonlightNaCl" version="0.0.1" viewmodes="maximized">
++<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="http://yourdomain/MoonlightNaCl" version="0.1.0" viewmodes="maximized">
+     <access origin="*" subdomains="true"></access>
+     <tizen:application id="ChqHQExU28.MoonlightNaCl" package="ChqHQExU28" required_version="3.0"/>
+     <content src="index.html"/>
+@@ -16,6 +16,10 @@
+     <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
+     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
++    <!-- Used by the box art cache (app private storage). If the app fails to install on your TV,
++         remove these two lines: everything keeps working, only the cache is lost. -->
++    <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
++    <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
+     <tizen:profile name="tv-samsung"/>
+     <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+ </widget>
+diff --git a/index.html b/index.html
+index b758169..4556c14 100644
+--- a/index.html
++++ b/index.html
+@@ -24,8 +24,8 @@
+         <nav class="mdl-navigation">
+           <div class="nav-menu-parent">
+             <div id="resolutionMenu">
+-              <button id="selectResolution" data-value="1280:720" class="mdl-button mdl-js-button">
+-                                720p
++              <button id="selectResolution" data-value="1920:1080" class="mdl-button mdl-js-button">
++                                1080p
+                             </button>
+             </div>
+ 
+@@ -60,11 +60,11 @@
+ 
+           <div class="nav-menu-parent">
+             <div id="bandwidthMenu">
+-              <button id="bitrateField" class="mdl-button">10 Mbps</button>
++              <button id="bitrateField" class="mdl-button">20 Mbps</button>
+             </div>
+ 
+             <div class="bitrateMenu mdl-menu mdl-js-menu mdl-js-ripple-effect" for="bandwidthMenu">
+-              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="10">
++              <input id="bitrateSlider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" step="0.5" value="20">
+             </div>
+ 
+             <div id="bandwidthTooltip" class="mdl-tooltip" for="bandwidthMenu">
+@@ -126,6 +126,7 @@
+       <div id="naclSpinner" class="mdl-progress mdl-js-progress mdl-progress__indeterminate">
+         <h5 id="naclSpinnerMessage"></h5>
+       </div>
++      <div id="modelCodePlaceholder"></div>
+     </main>
+   </div>
+   <script defer src="static/js/jquery-2.2.0.min.js"></script>
+@@ -142,7 +143,10 @@
+     <h3 class="mdl-dialog__title">Pairing</h3>
+     <div class="mdl-dialog__content">
+       <p id="pairingDialogText">
+-        Please enter the number XXXX on the GFE dialog on the computer. This dialog will be dismissed once complete
++        Please enter the following PIN on the target PC: XXXX<br><br>
++        If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>
++        Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>
++        This dialog will close once the pairing is complete.
+       </p>
+     </div>
+     <div class="mdl-dialog__actions">
+@@ -177,8 +181,17 @@
+     <h3 class="mdl-dialog__title">Add Host Manually</h3>
+     <div class="mdl-dialog__content">
+       <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+-        <input class="mdl-textfield__input" type="text" id="dialogInputHost" />
+-        <label class="mdl-textfield__label" for="dialogInputHost">IP Address or Hostname of GeForce PC</label>
++        <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="manualInputToggle">
++          <input type="checkbox" id="manualInputToggle" class="mdl-checkbox__input" onchange="toggleManualInput()">
++          <span class="mdl-checkbox__label">Enter IP or hostname manually (press Select)</span>
++        </label>
++        <div id="manualInput" style="display: none;">
++          <input type="text" id="manualIPAddress" class="mdl-textfield__input hovered" placeholder="Enter host IP address or hostname">
++        </div>
++        <select id="ipPart1" name="ipPart1" style="width: 50px;" tabindex="-1"></select>
++        <select id="ipPart2" name="ipPart2" style="width: 50px;" tabindex="-1"></select>
++        <select id="ipPart3" name="ipPart3" style="width: 50px;" tabindex="-1"></select>
++        <select id="ipPart4" name="ipPart4" style="width: 50px;" tabindex="-1"></select>
+       </div>
+     </div>
+     <div class="mdl-dialog__actions">
+@@ -186,10 +199,59 @@
+       <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="continueAddHost">Continue</button>
+     </div>
+   </dialog>
++  <dialog id="terminateMoonlightDialog" class="mdl-dialog">
++    <h3 class="mdl-dialog__title">Exit Moonlight</h3>
++    <div class="mdl-dialog__content">
++      <p id="terminateMoonlightDialogText">
++        Are you sure you want to exit Moonlight?
++      </p>
++    </div>
++    <div class="mdl-dialog__actions">
++      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="cancelTerminateMoonlight">Cancel</button>
++      <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect" id="exitTerminateMoonlight">Exit</button>
++    </div>
++  </dialog>
+   <div id="snackbar" class="mdl-snackbar mdl-js-snackbar">
+     <div class="mdl-snackbar__text"></div>
+     <button id="snackButton" class="mdl-snackbar__action" type="button"></button>
+     <!-- this button exists to suppress the snackbar warning. we're really using a toast. -->
+   </div>
++  <script>
++    // Host IP entry: four 0-255 selectors (navigated with up/down on the remote)
++    var ipParts = [
++      { element: 'ipPart1', selectedValue: 192 },
++      { element: 'ipPart2', selectedValue: 168 },
++      { element: 'ipPart3' },
++      { element: 'ipPart4' }
++    ];
++
++    function populateSelect(element, start, end, selectedValue) {
++      for (var i = start; i <= end; i++) {
++        var option = document.createElement('option');
++        option.value = i;
++        option.text = i;
++        if (i === selectedValue) {
++          option.selected = true;
++        }
++        element.appendChild(option);
++      }
++    }
++
++    ipParts.forEach(function (ipPart) {
++      populateSelect(document.getElementById(ipPart.element), 0, 255, ipPart.selectedValue);
++    });
++
++    function toggleManualInput() {
++      var manualInputToggle = document.getElementById('manualInputToggle');
++      var manualInputDiv = document.getElementById('manualInput');
++      var displayStyle = manualInputToggle.checked ? 'none' : 'inline-block';
++
++      manualInputDiv.style.display = manualInputToggle.checked ? 'block' : 'none';
++
++      ipParts.forEach(function (ipPart) {
++        document.getElementById(ipPart.element).style.display = displayStyle;
++      });
++    }
++  </script>
+ </body>
+ </html>
+\ No newline at end of file
+diff --git a/main.cpp b/main.cpp
+index 3e0f89d..3878dba 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -182,6 +182,8 @@ void MoonlightInstance::HandleMessage(const pp::Var& var_message) {
+         HandlePair(callbackId, params);
+     } else if (strcmp(method.c_str(), "STUN") == 0) {
+         HandleSTUN(callbackId, params);
++    } else if (strcmp(method.c_str(), "wakeOnLan") == 0) {
++        HandleWakeOnLan(callbackId, params);
+     } else {
+         pp::Var response("Unhandled message received: " + method);
+         PostMessage(response);
+@@ -336,6 +338,101 @@ void MoonlightInstance::STUNCallback(int32_t /*result*/, int32_t callbackId, pp:
+     PostMessage(ret);
+ }
+ 
++// ---------------------------------------------------------------------------
++// Wake-on-LAN
++// ---------------------------------------------------------------------------
++
++// Builds a Wake-on-LAN "magic packet" (6 x 0xFF followed by the MAC address
++// repeated 16 times) for a MAC address written as "AA:BB:CC:DD:EE:FF".
++// Returns false if the MAC address is not valid.
++static bool BuildWakeOnLanPacket(const std::string& macAddress, unsigned char packet[102]) {
++    unsigned int parts[6];
++    char trailing;
++
++    // The trailing %c makes sure there is nothing after the sixth byte
++    if (sscanf(macAddress.c_str(), "%2x:%2x:%2x:%2x:%2x:%2x%c",
++               &parts[0], &parts[1], &parts[2], &parts[3], &parts[4], &parts[5], &trailing) != 6) {
++        return false;
++    }
++
++    unsigned char mac[6];
++    for (int i = 0; i < 6; i++) {
++        mac[i] = (unsigned char)parts[i];
++    }
++
++    memset(packet, 0xFF, 6);
++    for (int i = 1; i <= 16; i++) {
++        memcpy(&packet[i * 6], mac, 6);
++    }
++    return true;
++}
++
++// Broadcasts the magic packet over UDP (ports 9 and 7, the two commonly used).
++// Returns 0 if at least one packet was sent, otherwise a non-zero error code.
++static int SendWakeOnLanPacket(const unsigned char* packet, size_t length) {
++    int udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
++    if (udpSocket < 0) {
++        return -1;
++    }
++
++#ifdef SO_BROADCAST
++    // Not every socket layer supports this option. If it is refused we still
++    // try to send, since some of them allow broadcasting anyway.
++    int broadcast = 1;
++    setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
++#endif
++
++    static const unsigned short ports[] = {9, 7};
++    int sent = 0;
++
++    for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
++        struct sockaddr_in addr;
++        memset(&addr, 0, sizeof(addr));
++        addr.sin_family = AF_INET;
++        addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
++        addr.sin_port = htons(ports[i]);
++
++        int sentBytes = (int)sendto(udpSocket, packet, length, 0, (struct sockaddr*)&addr, sizeof(addr));
++        if (sentBytes == (int)length) {
++            sent++;
++        }
++    }
++
++    close(udpSocket);
++    return sent > 0 ? 0 : -2;
++}
++
++void MoonlightInstance::HandleWakeOnLan(int32_t callbackId, pp::VarArray args) {
++    // Sockets must not be used from the main thread, so do it on a worker
++    // thread, like the HTTP, pairing and STUN requests.
++    m_HttpThreadPool[m_HttpThreadPoolSequence++ % HTTP_HANDLER_THREADS]->message_loop().PostWork(
++        m_CallbackFactory.NewCallback(&MoonlightInstance::WakeOnLanCallback, callbackId, args));
++}
++
++void MoonlightInstance::WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args) {
++    unsigned char packet[102];
++    int err;
++
++    if (!BuildWakeOnLanPacket(args.Get(0).AsString(), packet)) {
++        err = -3; // invalid MAC address
++    } else {
++        err = SendWakeOnLanPacket(packet, sizeof(packet));
++    }
++
++    pp::VarDictionary ret;
++    ret.Set("callbackId", pp::Var(callbackId));
++    if (err == 0) {
++        ret.Set("type", pp::Var("resolve"));
++        ret.Set("ret", pp::VarDictionary());
++    }
++    else {
++        ret.Set("type", pp::Var("reject"));
++        ret.Set("ret", pp::Var(err));
++    }
++
++    PostMessage(ret);
++}
++
+ bool MoonlightInstance::Init(uint32_t argc,
+                              const char* argn[],
+                              const char* argv[]) {
+diff --git a/moonlight.hpp b/moonlight.hpp
+index 2fc5e60..8f71275 100644
+--- a/moonlight.hpp
++++ b/moonlight.hpp
+@@ -100,8 +100,10 @@ class MoonlightInstance : public pp::Instance, public pp::MouseLock {
+         void HandleStopStream(int32_t callbackId, pp::VarArray args);
+         void HandleOpenURL(int32_t callbackId, pp::VarArray args);
+         void HandleSTUN(int32_t callbackId, pp::VarArray args);
++        void HandleWakeOnLan(int32_t callbackId, pp::VarArray args);
+         void PairCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
+         void STUNCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
++        void WakeOnLanCallback(int32_t /*result*/, int32_t callbackId, pp::VarArray args);
+     
+         bool TryHandleNativeTouchEvent(const pp::InputEvent& event);
+         bool HandleInputEvent(const pp::InputEvent& event);
+diff --git a/static/css/style.css b/static/css/style.css
+index e6ce8c5..c22e4a0 100644
+--- a/static/css/style.css
++++ b/static/css/style.css
+@@ -329,4 +329,78 @@ main {
+ }
+ #nacl_module {
+     cursor: none;
+-}
+\ No newline at end of file
++}
++/* ---------------------------------------------------------------------------
++   Styles ported from the current Moonlight for Tizen (WASM) app
++   --------------------------------------------------------------------------- */
++
++/* Per-host settings button (replaces the old "remove host" icon) */
++.host-settings {
++    position: absolute;
++    right: 5px;
++    top: 5px;
++    width: 24px;
++    height: 24px;
++    z-index: 5;
++    background-image: url('../res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg');
++    background-repeat: no-repeat;
++    background-size: 20px 20px;
++    background-position: center;
++    border: 0;
++    cursor: pointer;
++}
++
++/* Clear highlight for whatever the remote/controller has selected */
++#continueAddHost:focus, #cancelAddHost:focus,
++#continueDeleteHost:focus, #cancelDeleteHost:focus,
++#cancelPairingDialog:focus,
++#backIcon:focus, #quitCurrentApp:focus,
++#continueQuitApp:focus, #cancelQuitApp:focus,
++#exitTerminateMoonlight:focus, #cancelTerminateMoonlight:focus,
++.mdl-icon-toggle:focus, .mdl-button:focus {
++    background-color: #404354;
++    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
++}
++#ipPart1.hovered, #ipPart2.hovered, #ipPart3.hovered, #ipPart4.hovered {
++    background-color: #404354;
++    box-shadow: rgba(0, 163, 198, 1) 0px 0px 1px 2px;
++    color: white;
++}
++.mdl-textfield__input.hovered {
++    background-color: #404354;
++}
++
++/* TV model / app version / Tizen version, bottom left */
++#modelCodePlaceholder {
++    position: fixed;
++    bottom: 1cm;
++    left: 1cm;
++    font-size: 12px;
++}
++
++/* Host settings dialog: one full-width button per action */
++dialog[id^="settingsDialog-"] .mdl-dialog__content {
++    display: flex;
++    flex-direction: column;
++    align-items: stretch;
++}
++dialog[id^="settingsDialog-"] .mdl-dialog__content button {
++    margin-bottom: 10px;
++    width: 100%;
++}
++dialog[id^="settingsDialog-"] .mdl-dialog__actions button {
++    width: 100%;
++}
++
++/* Add Host dialog: IP address selectors */
++#addHostDialog .mdl-textfield {
++    width: 100%;
++}
++#addHostDialog select {
++    background-color: #333846;
++    color: white;
++    font-size: 1.2rem;
++}
++#manualIPAddress {
++    width: 100%;
++}
+diff --git a/static/js/index.js b/static/js/index.js
+index fcd30b5..5127099 100644
+--- a/static/js/index.js
++++ b/static/js/index.js
+@@ -4,6 +4,57 @@ var pairingCert;
+ var myUniqueid = '0123456789ABCDEF'; // Use the same UID as other Moonlight clients to allow them to quit each other's games
+ var api; // `api` should only be set if we're in a host-specific screen. on the initial screen it should always be null.
+ var isInGame = false; // flag indicating whether the game stream started
++var isDialogOpen = false; // track whether the dialog is open
++
++// Shows the TV model, app version and Tizen version at the bottom of the screen.
++// Every lookup is guarded: none of this is critical, so a TV that refuses one of
++// the calls must not break the app.
++function loadProductInfos() {
++  var modelCodePlaceholder = document.getElementById('modelCodePlaceholder');
++  if (!modelCodePlaceholder) {
++    return;
++  }
++
++  var model = 'Not Available';
++  var moonlightVersion = 'Not Available';
++  var tizenVersion = 'Not Available';
++
++  try {
++    model = window.tizen.systeminfo.getCapability('http://tizen.org/system/model_name') || model;
++  } catch (e) {
++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the TV model', e);
++  }
++  try {
++    moonlightVersion = window.tizen.application.getAppInfo().version || moonlightVersion;
++  } catch (e) {
++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the app version', e);
++  }
++  try {
++    tizenVersion = window.tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version') || tizenVersion;
++  } catch (e) {
++    console.warn('%c[index.js, loadProductInfos]', 'color: green;', 'Could not read the Tizen version', e);
++  }
++
++  modelCodePlaceholder.innerText = 'TV Model: ' + model + ' ; Moonlight: v' + moonlightVersion + ' ; Tizen: v' + tizenVersion;
++}
++
++// Holding a controller button repeats the action (navigating long lists)
++var repeatAction = null;
++var repeatKey = null;
++var lastInvokeTime = 0;
++var repeatStartTimeout = null;
++var REPEAT_START_DELAY = 350;
++var REPEAT_INTERVAL = 100;
++
++function repeatActionHandler() {
++  if (repeatAction && Date.now() - lastInvokeTime > REPEAT_INTERVAL) {
++    repeatAction();
++    lastInvokeTime = Date.now();
++  }
++  if (repeatAction) {
++    requestAnimationFrame(repeatActionHandler);
++  }
++}
+ 
+ // Called by the common.js module.
+ function attachListeners() {
+@@ -39,9 +90,6 @@ function attachListeners() {
+     var pressed = e.detail.pressed;
+     var key = e.detail.key;
+ 
+-    if (!pressed)
+-      return;
+-
+     var gamepadMapping = {
+       0: () => Navigation.accept(),
+       1: () => Navigation.back(),
+@@ -52,8 +100,28 @@ function attachListeners() {
+       14: () => Navigation.left(),
+       15: () => Navigation.right(),
+     };
+-    if (gamepadMapping[key]) {
+-      gamepadMapping[key]();
++
++    if (pressed) {
++      if (gamepadMapping[key]) {
++        gamepadMapping[key]();
++
++        // Only the directional buttons repeat while held. Accept/back/start/select
++        // must fire once, otherwise holding "A" would keep pressing things.
++        if (key >= 12 && key <= 15) {
++          clearTimeout(repeatStartTimeout);
++          repeatKey = key;
++          repeatAction = gamepadMapping[key];
++          lastInvokeTime = Date.now();
++          repeatStartTimeout = setTimeout(() => {
++            requestAnimationFrame(repeatActionHandler);
++          }, REPEAT_START_DELAY);
++        }
++      }
++    } else if (key === repeatKey) {
++      // Releasing the button that is repeating stops the repeat
++      repeatAction = null;
++      repeatKey = null;
++      clearTimeout(repeatStartTimeout);
+     }
+   });
+ }
+@@ -162,6 +230,21 @@ function stopBackgroundPollingOfHost(host) {
+   delete activePolls[host.serverUid];
+ }
+ 
++// Saves the host list again when the host's MAC address changed, so that
++// Wake-on-LAN keeps working after the PC's network adapter changes.
++function updateMacAddress(host) {
++  getData('hosts', function (previousValue) {
++    var storedHosts = previousValue.hosts != null ? previousValue.hosts : {};
++    var currentHostUID = host.serverUid;
++    if (host.macAddress && host.macAddress != '00:00:00:00:00:00') {
++      if (storedHosts[currentHostUID] && storedHosts[currentHostUID].macAddress != host.macAddress) {
++        console.log('Updated MAC address for host ' + host.hostname + ' from ' + storedHosts[currentHostUID].macAddress + ' to ' + host.macAddress);
++        saveHosts();
++      }
++    }
++  });
++}
++
+ function snackbarLog(givenMessage) {
+   console.log('%c[index.js, snackbarLog]', 'color: green;', givenMessage);
+   var data = {
+@@ -231,7 +314,7 @@ function loadHTTPCertsCb() {
+       getData('hosts', function (previousValue) {
+         hosts = previousValue.hosts != null ? previousValue.hosts : {};
+         for (var hostUID in hosts) { // programmatically add each new host.
+-          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress);
++          var revivedHost = new NvHTTP(hosts[hostUID].address, myUniqueid, hosts[hostUID].userEnteredAddress, hosts[hostUID].macAddress);
+           revivedHost.serverUid = hosts[hostUID].serverUid;
+           revivedHost.externalIP = hosts[hostUID].externalIP;
+           revivedHost.hostname = hosts[hostUID].hostname;
+@@ -247,6 +330,10 @@ function loadHTTPCertsCb() {
+ 
+ // pair to the given NvHTTP host object.  Returns whether pairing was successful.
+ function pairTo(nvhttpHost, onSuccess, onFailure) {
++  if (!onFailure) {
++    onFailure = function () {}; // callers such as "Add Host" don't pass a failure callback
++  }
++
+   if (!pairingCert) {
+     snackbarLog('ERROR: cert has not been generated yet. Is NaCl initialized?');
+     console.warn('%c[index.js]', 'color: green;', 'User wants to pair, and we still have no cert. Problem = very yes.');
+@@ -256,7 +343,7 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
+ 
+   nvhttpHost.pollServer(function (ret) {
+     if (!nvhttpHost.online) {
+-      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
++      snackbarLog('Failed to connect to ' + nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
+       console.error('%c[index.js]', 'color: green;', 'Host declared as offline:', nvhttpHost, nvhttpHost.toString()); //Logging both the object and the toString version for text logs
+       onFailure();
+       return;
+@@ -267,15 +354,12 @@ function pairTo(nvhttpHost, onSuccess, onFailure) {
+       return;
+     }
+ 
+-    if (nvhttpHost.currentGame != 0) {
+-      snackbarLog(nvhttpHost.hostname + ' is currently in game. Quit the running app or restart the computer, then try again.');
+-      onFailure();
+-      return;
+-    }
+-
+     var randomNumber = String("0000" + cryptoRand(10000)).slice(-4);
+     var pairingDialog = document.querySelector('#pairingDialog');
+-    $('#pairingDialogText').html('Please enter the number ' + randomNumber + ' on the GFE dialog on the computer.  This dialog will be dismissed once complete');
++    $('#pairingDialogText').html('Please enter the following PIN on the target PC:  ' + randomNumber + '<br><br>If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.<br>Alternatively, navigate to the GeForce Experience (NVIDIA GPUs only) to enter the PIN.<br><br>This dialog will close once the pairing is complete.');
++    if (pairingDialog.open) {
++      pairingDialog.close(); // showModal() throws if the dialog is already open
++    }
+     pairingDialog.showModal();
+     Navigation.push(Views.PairingDialog);
+ 
+@@ -335,6 +419,9 @@ function hostChosen(host) {
+ // give the user a dialog to input connection details for the PC
+ function addHost() {
+   var modal = document.querySelector('#addHostDialog');
++  if (modal.open) {
++    modal.close(); // showModal() throws if the dialog is already open
++  }
+   modal.showModal();
+   Navigation.push(Views.AddHostDialog);
+ 
+@@ -348,10 +435,39 @@ function addHost() {
+   // try to pair if they continue
+   $('#continueAddHost').off('click');
+   $('#continueAddHost').on('click', function () {
+-    var inputHost = $('#dialogInputHost').val();
++    var continueButton = $(this);
++    continueButton.prop('disabled', true); // so users don't send multiple requests
++
++    var inputHost;
++    if ($('#manualInputToggle').prop('checked')) {
++      // Manual input: IP address or hostname typed by the user
++      inputHost = $.trim($('#manualIPAddress').val());
++    } else {
++      // Four selectors, one per IP address part
++      inputHost = [
++        $('#ipPart1').val(),
++        $('#ipPart2').val(),
++        $('#ipPart3').val(),
++        $('#ipPart4').val()
++      ].join('.');
++    }
++
++    if (!inputHost) {
++      snackbarLog('Please enter the IP address or hostname of the host PC');
++      continueButton.prop('disabled', false);
++      return;
++    }
++
+     var _nvhttpHost = new NvHTTP(inputHost, myUniqueid, inputHost);
+ 
+     _nvhttpHost.refreshServerInfoAtAddress(inputHost).then(function (success) {
++      if (success === false) {
++        // The address answered, but not like a GameStream/Sunshine host
++        snackbarLog('Failed to connect to ' + inputHost + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
++        continueButton.prop('disabled', false);
++        return;
++      }
++
+       modal.close();
+       Navigation.pop();
+ 
+@@ -375,9 +491,11 @@ function addHost() {
+           saveHosts();
+         });
+       }
++      continueButton.prop('disabled', false);
+     }.bind(this),
+       function (failure) {
+-        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure that GameStream is enabled in GeForce Experience.');
++        snackbarLog('Failed to connect to ' + _nvhttpHost.hostname + '! Ensure Sunshine is running on your host PC or GameStream is enabled in GeForce Experience SHIELD settings.');
++        continueButton.prop('disabled', false);
+       }.bind(this));
+   });
+ }
+@@ -385,7 +503,8 @@ function addHost() {
+ 
+ // host is an NvHTTP object
+ function addHostToGrid(host, ismDNSDiscovered) {
+-
++  // The card's children, in order: [0] settings dialog, [1] clickable cell,
++  // [2] settings button (not present for mDNS hosts). navigation.js relies on this.
+   var outerDiv = $("<div>", {
+     class: 'host-container mdl-card mdl-shadow--4dp',
+     id: 'host-container-' + host.serverUid,
+@@ -401,17 +520,71 @@ function addHostToGrid(host, ismDNSDiscovered) {
+     class: "mdl-card__title-text",
+     html: host.hostname
+   }));
+-  var removalButton = $("<div>", {
+-    class: "remove-host",
+-    id: "removeHostButton-" + host.serverUid,
++  var settingsButton = $("<div>", {
++    class: "host-settings",
++    id: "hostSettingsButton-" + host.serverUid,
+     role: 'button',
+     tabindex: 0,
+-    'aria-label': 'Remove host ' + host.hostname
++    'aria-label': 'Settings ' + host.hostname
+   });
+-  removalButton.off('click');
+-  removalButton.click(function () {
+-    removeClicked(host);
++
++  // Per-host settings dialog (Wake-on-LAN, refresh box art, remove host)
++  var settingsDialog = $('<dialog>', {
++    class: 'mdl-dialog',
++    id: "settingsDialog-" + host.serverUid
++  }).appendTo(outerDiv);
++
++  $('<h4>', {
++    class: 'mdl-dialog__title',
++    text: 'Settings ' + host.hostname
++  }).appendTo(settingsDialog);
++
++  var dialogContent = $('<div>', {
++    class: 'mdl-dialog__content'
++  }).appendTo(settingsDialog);
++
++  // Element ids include the host's unique id, so several hosts never clash
++  var options = [ // an array to make it easy to add more options
++    { text: 'Wake PC (WOL)', id: 'wake-' + host.serverUid, action: function () { host.sendWOL().catch(function () {}); } },
++    { text: 'Refresh box art', id: 'refreshBoxArt-' + host.serverUid, action: function () { host.purgeBoxArt().catch(function () {}); } },
++    { text: 'Remove ' + host.hostname, id: 'remove-' + host.serverUid, action: function () { removeClicked(host); } }
++  ];
++
++  options.forEach(function (option) {
++    var button = $('<button>', {
++      class: 'mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect',
++      text: option.text,
++      id: option.id
++    });
++    button.click(function () {
++      Navigation.pop();
++      settingsDialog[0].close();
++      option.action();
++    });
++    button.appendTo(dialogContent);
+   });
++
++  $('<button>', {
++    type: 'button',
++    class: 'mdl-button',
++    text: 'Close',
++    id: 'closeSettingsDialog-' + host.serverUid
++  }).click(function () {
++    settingsDialog[0].close();
++    Navigation.pop();
++  }).appendTo($('<div>', {
++    class: 'mdl-dialog__actions'
++  }).appendTo(settingsDialog));
++
++  if (!settingsDialog[0].showModal && window.dialogPolyfill) {
++    dialogPolyfill.registerDialog(settingsDialog[0]);
++  }
++
++  settingsButton.click(function () {
++    settingsDialog[0].showModal();
++    Navigation.push(Views.SettingsDialog, host.serverUid);
++  });
++
+   cell.off('click');
+   cell.click(function () {
+     hostChosen(host);
+@@ -423,8 +596,8 @@ function addHostToGrid(host, ismDNSDiscovered) {
+   });
+   $(outerDiv).append(cell);
+   if (!ismDNSDiscovered) {
+-    // we don't have the option to delete mDNS hosts.  So don't show it to the user.
+-    $(outerDiv).append(removalButton);
++    // we don't have the option to delete or wake mDNS hosts, so don't show it to the user.
++    $(outerDiv).append(settingsButton);
+   }
+   $('#host-grid').append(outerDiv);
+   hosts[host.serverUid] = host;
+@@ -460,6 +633,40 @@ function removeClicked(host) {
+   });
+ }
+ 
++// Asks for confirmation before leaving Moonlight. Opened with the Back button
++// (or the controller's B button) on the hosts screen.
++function showTerminateMoonlightDialog() {
++  var terminateMoonlightDialog = document.querySelector('#terminateMoonlightDialog');
++  if (isDialogOpen) {
++    return;
++  }
++
++  terminateMoonlightDialog.showModal();
++  Navigation.push(Views.TerminateMoonlightDialog);
++  isDialogOpen = true;
++
++  // Close the dialog if the Cancel button is pressed
++  $('#cancelTerminateMoonlight').off('click');
++  $('#cancelTerminateMoonlight').on('click', function () {
++    terminateMoonlightDialog.close();
++    isDialogOpen = false;
++    Navigation.pop();
++  });
++
++  // Terminate the application if the Exit button is pressed
++  $('#exitTerminateMoonlight').off('click');
++  $('#exitTerminateMoonlight').on('click', function () {
++    terminateMoonlightDialog.close();
++    isDialogOpen = false;
++    Navigation.pop();
++    try {
++      tizen.application.getCurrentApplication().exit();
++    } catch (e) {
++      console.error('%c[index.js, showTerminateMoonlightDialog]', 'color: green;', 'Could not exit the application', e);
++    }
++  });
++}
++
+ // puts the CSS style for current app on the app that's currently running
+ // and puts the CSS style for non-current app apps that aren't running
+ // this requires a hot-off-the-host `api`, and the appId we're going to stylize
+@@ -1107,6 +1314,7 @@ function onWindowLoad() {
+   console.log('%c[index.js]', 'color: green;', 'Moonlight\'s main window loaded');
+   // don't show the game selection div
+   $('#gameSelection').css('display', 'none');
++  loadProductInfos();
+   console.log('load stored resolution prefs');
+   getData('resolution', function (previousValue) {
+     if (previousValue.resolution != null) {
+diff --git a/static/js/navigation.js b/static/js/navigation.js
+index bcd7ee7..83079c5 100644
+--- a/static/js/navigation.js
++++ b/static/js/navigation.js
+@@ -57,6 +57,16 @@ ListView.prototype.current = function() {
+   return this.func()[this.index];
+ }
+ 
++// Helper for the Add Host dialog: up/down changes the IP part that is selected
++function adjustIpPartValue(view, increment) {
++  var currentId = view.view.current();
++  if (typeof currentId === 'string' && currentId.indexOf('ipPart') === 0) {
++    var digitElement = document.getElementById(currentId);
++    var currentValue = parseInt(digitElement.value, 10) || 0;
++    digitElement.value = (currentValue + increment + 256) % 256;
++  }
++}
++
+ function navigateGameCards(offset) { //helper function for Apps view
+   var gameCards = Array.from(document.getElementById('game-grid').children);
+   var currentIndex = gameCards.indexOf(gameCard);
+@@ -68,6 +78,11 @@ function navigateGameCards(offset) { //helper function for Apps view
+   }
+ }
+ 
++function isTypingInAddHostField() {
++  var active = document.activeElement;
++  return !!active && active.id === 'manualIPAddress';
++}
++
+ var Views = {
+   Hosts: {
+     view: new ListView(() => document.getElementById('host-grid').children),
+@@ -80,15 +95,18 @@ var Views = {
+       if (element.id === 'addHostCell') {
+         element.click();
+       } else {
+-        element.children[0].click();
++        element.children[1].click(); // [0] is the host's settings dialog
+       }
+     },
++    back: function () { showTerminateMoonlightDialog() },
+     startBtn: function () {
++      // Opens the host's settings (Wake PC, refresh box art, remove)
+       var element = this.view.current();
+-      if (element.id != 'addHostCell') {
+-        element.children[1].click();
++      if (element.id != 'addHostCell' && element.children[2]) {
++        element.children[2].click();
+       }
+     },
++    selectBtn: function () { },
+     enter: function () { mark(this.view.current()) },
+     leave: function () { unmark(this.view.current()) },
+   },
+@@ -112,17 +130,23 @@ var Views = {
+   },
+   AddHostDialog: {
+     view: new ListView(function () {
+-        return [
+-          'dialogInputHost', 
+-          'continueAddHost', 
+-          'cancelAddHost'
+-        ];
++      if (document.getElementById('manualInputToggle').checked) {
++        return ['manualInputToggle', 'manualIPAddress', 'continueAddHost', 'cancelAddHost'];
++      } else {
++        return ['manualInputToggle', 'ipPart1', 'ipPart2', 'ipPart3', 'ipPart4', 'continueAddHost', 'cancelAddHost'];
++      }
+     }),
+-    left: function () { if (this.view.current() !== 'dialogInputHost') {this.view.prev() } },
+-    right: function () { if (this.view.current() !== 'dialogInputHost') {this.view.next() } },
+-    up: function () { this.view.prev() },
+-    down: function () { this.view.next()},
++    // While the user is typing in the text field, left/right move the text cursor
++    left: function () { if (!isTypingInAddHostField()) { this.view.prev() } },
++    right: function () { if (!isTypingInAddHostField()) { this.view.next() } },
++    up: function () {
++      if (document.getElementById('manualInputToggle').checked) { this.view.prev() } else { adjustIpPartValue(this, 1) }
++    },
++    down: function () {
++      if (document.getElementById('manualInputToggle').checked) { this.view.next() } else { adjustIpPartValue(this, -1) }
++    },
+     accept: function () { document.getElementById(this.view.current()).click() },
++    selectBtn: function () { document.getElementById('manualInputToggle').click() },
+     back: function () { document.getElementById('cancelAddHost').click() },
+     enter: function () { mark(this.view.current()) },
+     leave: function () { unmark(this.view.current()) },
+@@ -195,6 +219,31 @@ var Views = {
+     enter: function () { mark(this.view.current()) },
+     leave: function () { unmark(this.view.current()) },
+   },
++  SettingsDialog: {
++    // hostKey is set by Navigation.push(view, hostKey) and is the host's unique id
++    view: new ListView(function () {
++      var key = Views.SettingsDialog.hostKey;
++      return ['wake-' + key, 'refreshBoxArt-' + key, 'remove-' + key, 'closeSettingsDialog-' + key];
++    }),
++    accept: function () { document.getElementById(this.view.current()).click() },
++    back: function () { document.getElementById('closeSettingsDialog-' + this.hostKey).click() },
++    down: function () { this.view.next() },
++    up: function () { this.view.prev() },
++    enter: function () { mark(this.view.current()) },
++    leave: function () { unmark(this.view.current()) },
++  },
++  TerminateMoonlightDialog: {
++    view: new ListView(function () {
++      return ['exitTerminateMoonlight', 'cancelTerminateMoonlight']
++    }),
++    left: function () { this.view.prev() },
++    right: function () { this.view.next() },
++    down: function () { document.getElementById('exitTerminateMoonlight').focus() },
++    accept: function () { document.getElementById(this.view.current()).click() },
++    back: function () { document.getElementById('cancelTerminateMoonlight').click() },
++    enter: function () { mark(this.view.current()) },
++    leave: function () { unmark(this.view.current()) },
++  },
+   AppsNav: {
+     view: new ListView(function () {
+       return ['backIcon', 'quitCurrentApp']
+@@ -257,10 +306,13 @@ var Navigation = (function () {
+   var Stack = (function () {
+     var viewStack = [];
+ 
+-    function push(view) {
++    function push(view, hostKey) {
+       if (get()) {
+         get().leave();
+       }
++      if (hostKey !== undefined) {
++        view.hostKey = hostKey; // lets a shared view (e.g. host settings) know which host it is for
++      }
+       viewStack.push(view);
+       get().enter();
+     }
+@@ -358,6 +410,7 @@ var Navigation = (function () {
+     up: runOp('up'),
+     down: runOp('down'),
+     startBtn: runOp('startBtn'),
++    selectBtn: runOp('selectBtn'),
+     push: Stack.push,
+     change: Stack.change,
+     pop: Stack.pop,
+diff --git a/static/js/utils.js b/static/js/utils.js
+index 7bff1d4..e0d8183 100644
+--- a/static/js/utils.js
++++ b/static/js/utils.js
+@@ -90,9 +90,10 @@ String.prototype.toHex = function() {
+   return hex;
+ }
+ 
+-function NvHTTP (address, clientUid, userEnteredAddress) {
++function NvHTTP (address, clientUid, userEnteredAddress, macAddress) {
+   console.log('%c[utils.js, NvHTTP Object]', 'color: gray;', this);
+   this.address = address;
++  this.macAddress = macAddress; // used by Wake-on-LAN
+   this.ppkstr = null;
+   this.paired = false;
+   this.currentGame = 0;
+@@ -217,6 +218,7 @@ NvHTTP.prototype = {
+       // as online initially
+       if (this.paired && this._pollCount++ % 10 == 1) {
+         this.getAppListWithCacheFlush();
++        updateMacAddress(this); // keep the stored MAC address (used by Wake-on-LAN) up to date
+       }
+ 
+       this._consecutivePollFailures = 0;
+@@ -267,6 +269,7 @@ NvHTTP.prototype = {
+     var string = '';
+     string += 'server address: ' + this.address + '\r\n';
+     string += 'server UID: ' + this.serverUid + '\r\n';
++    string += 'mac address: ' + this.macAddress + '\r\n';
+     string += 'is paired: ' + this.paired + '\r\n';
+     string += 'current game: ' + this.currentGame + '\r\n';
+     string += 'server major version: ' + this.serverMajorVersion + '\r\n';
+@@ -302,6 +305,12 @@ NvHTTP.prototype = {
+     this.serverMajorVersion = parseInt(this.appVersion.substring(0, 1), 10);
+     this.serverUid = $root.find('uniqueid').text().trim();
+     this.hostname = $root.find('hostname').text().trim();
++    // Hosts report 00:00:00:00:00:00 when they don't know their MAC address.
++    // Never replace a good stored address with that.
++    var reportedMac = $root.find('mac').text().trim();
++    if (reportedMac && reportedMac != '00:00:00:00:00:00') {
++      this.macAddress = reportedMac;
++    }
+ 
+     var externIP = $root.find('ExternalIP').text().trim();
+     if (externIP) {
+@@ -417,72 +426,156 @@ NvHTTP.prototype = {
+ 
+   // returns the box art of the given appID.
+   // three layers of response time are possible: memory cached (in javascript), storage cached (in chrome.storage.local), and streamed (host sends binary over the network)
+-  getBoxArt: function (appId) {
+-    // if (chrome.storage) {
+-    //   // This may be bad practice to push/pull this much data through local storage?
+-    //   return new Promise(function(resolve, reject) {
+-    //     chrome.storage.local.get('boxart-' + appId, function(storageData) {
+-    //       // if we already have it, load it.
+-    //       if (storageData !== undefined && Object.keys(storageData).length !== 0 && storageData['boxart-' + appId].constructor !== Object) {
+-    //         console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
+-    //         resolve(storageData['boxart-' + appId]);
+-    //         return;
+-    //       }
+-
+-    //       // otherwise, put it in our cache, then return it
+-    //       sendMessage('openUrl', [
+-    //         this._baseUrlHttps +
+-    //         '/appasset?' + this._buildUidStr() +
+-    //         '&appid=' + appId +
+-    //         '&AssetType=2&AssetIdx=0',
+-    //         this.ppkstr,
+-    //         true
+-    //       ]).then(function(boxArtBuffer) {
+-    //         var reader = new FileReader();
+-    //         reader.onloadend = function() {
+-    //           var obj = {};
+-    //           obj['boxart-' + appId] = this.result;
+-    //           chrome.storage.local.set(obj, function(onSuccess) {});
+-    //           console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
+-    //           resolve(this.result);
+-    //         }
+-    //         reader.readAsDataURL(new Blob([boxArtBuffer], {
+-    //           type: "image/png"
+-    //         }));
+-    //       }.bind(this), function(error) {
+-    //         console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
+-    //         reject(error);
+-    //         return;
+-    //       }.bind(this));
+-    //     }.bind(this));
+-    //   }.bind(this));
+-
+-    // } else { // shouldn't run because we always have chrome.storage, but I'm not going to antagonize other browsers
+-    console.warn('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'chrome.storage not detected! Box art will not be saved!');
+-    return new Promise((resolve, reject) => {
+-      sendMessage('openUrl', [
+-        this._baseUrlHttps +
+-        '/appasset?' + this._buildUidStr() +
+-        '&appid=' + appId +
+-        '&AssetType=2&AssetIdx=0',
+-        this.ppkstr,
+-        true
+-      ]).then((boxArtBuffer) => {
+-        var reader = new FileReader();
+-        reader.onloadend = function () {
+-          var obj = {};
+-          obj['boxart-' + appId] = this.result;
+-          console.log('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
+-          resolve(this.result);
++  // ---------------------------------------------------------------------------
++  // Box art cache
++  //
++  // Box art is kept in the app's private storage so the app list does not have
++  // to download every image from the host each time it is opened. Every storage
++  // access is wrapped in try/catch: if this TV refuses it (or the API is not
++  // available on this firmware) we silently fall back to downloading the image,
++  // exactly like the previous version did.
++  // ---------------------------------------------------------------------------
++
++  // Folder name (inside wgt-private) used for this host's box art
++  _boxArtDirName: function () {
++    var id = this.serverUid || this.hostname || 'host';
++    return 'boxart-' + String(id).replace(/[^A-Za-z0-9_-]/g, '_');
++  },
++
++  // "Refresh box art" bumps this number, which makes every cached file stale
++  _boxArtGeneration: function () {
++    try {
++      return parseInt(window.localStorage.getItem('boxArtGen-' + this.serverUid), 10) || 0;
++    } catch (e) {
++      return 0;
++    }
++  },
++
++  // Creates the host's box art folder if it does not exist yet. Never rejects:
++  // if it fails, the later read/write attempts fail too and we use the network.
++  _ensureBoxArtDir: function () {
++    var dirName = this._boxArtDirName();
++    this._boxArtDirPromises = this._boxArtDirPromises || {};
++    if (!this._boxArtDirPromises[dirName]) {
++      this._boxArtDirPromises[dirName] = new Promise(function (resolve) {
++        try {
++          tizen.filesystem.resolve('wgt-private', function (root) {
++            try {
++              root.resolve(dirName);
++            } catch (notFound) {
++              try {
++                root.createDirectory(dirName);
++              } catch (createError) {
++                console.warn('%c[utils.js, _ensureBoxArtDir]', 'color: gray;', 'Could not create box art folder', createError);
++              }
++            }
++            resolve();
++          }, function () {
++            resolve();
++          }, 'rw');
++        } catch (e) {
++          resolve();
+         }
+-        reader.readAsDataURL(new Blob([boxArtBuffer], {
+-          type: "image/png"
+-        }));
+-      }, (error) => {
+-        console.error('%c[utils.js, utils.js,  getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
+-        reject(error);
+-        return;
+       });
++    }
++    return this._boxArtDirPromises[dirName];
++  },
++
++  getBoxArt: function (appId) {
++    return this._ensureBoxArtDir().then(function () {
++      return new Promise(function (resolve, reject) {
++        var boxArtFilePath = 'wgt-private/' + this._boxArtDirName() +
++          '/boxart-' + appId + '-g' + this._boxArtGeneration();
++
++        var fetchFromNetwork = function () {
++          sendMessage('openUrl', [
++            this._baseUrlHttps +
++            '/appasset?' + this._buildUidStr() +
++            '&appid=' + appId +
++            '&AssetType=2&AssetIdx=0',
++            this.ppkstr,
++            true
++          ]).then(function (boxArtBuffer) {
++            var reader = new FileReader();
++            reader.onloadend = function () {
++              var dataUrl = reader.result;
++              try {
++                var writeHandle = tizen.filesystem.openFile(boxArtFilePath, 'w', true);
++                writeHandle.writeData(new Uint8Array(boxArtBuffer));
++                writeHandle.close();
++              } catch (writeError) {
++                // Not fatal: we still have the image, it just won't be cached
++                console.warn('%c[utils.js, getBoxArt]', 'color: gray;', 'Could not cache box art', writeError);
++              }
++              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning network-fetched box art');
++              resolve(dataUrl);
++            };
++            reader.readAsDataURL(new Blob([boxArtBuffer], {
++              type: 'image/png'
++            }));
++          }, function (error) {
++            console.error('%c[utils.js, getBoxArt]', 'color: gray;', 'Box-art request failed!', error);
++            reject(error);
++          });
++        }.bind(this);
++
++        // 1) Cache hit?
++        try {
++          var readHandle = tizen.filesystem.openFile(boxArtFilePath, 'r');
++          var cachedBlob = readHandle.readBlob();
++          readHandle.close();
++
++          var cachedReader = new FileReader();
++          cachedReader.onloadend = function () {
++            // A tiny result means an empty/corrupt file: download it again
++            if (cachedReader.result && cachedReader.result.length > 100) {
++              console.log('%c[utils.js, getBoxArt]', 'color: gray;', 'Returning storage-cached box art for app: ', appId);
++              resolve(cachedReader.result);
++            } else {
++              fetchFromNetwork();
++            }
++          };
++          // The stored file has no type: tag it as an image so the data URL is correct
++          cachedReader.readAsDataURL(new Blob([cachedBlob], { type: 'image/png' }));
++          return;
++        } catch (notCached) {
++          // Not cached yet (or storage unavailable): use the network
++        }
++
++        // 2) Download and (try to) cache
++        fetchFromNetwork();
++      }.bind(this));
++    }.bind(this));
++  },
++
++  // Makes every cached image stale, so they are downloaded again next time
++  purgeBoxArt: function () {
++    return new Promise(function (resolve, reject) {
++      try {
++        window.localStorage.setItem('boxArtGen-' + this.serverUid, String(this._boxArtGeneration() + 1));
++        console.log('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Box art cache invalidated for host:', this.hostname);
++        snackbarLog('Box art will be downloaded again the next time you open the apps list');
++        resolve();
++      } catch (e) {
++        console.error('%c[utils.js, purgeBoxArt]', 'color: gray;', 'Failed to invalidate the box art cache!', e);
++        snackbarLog('Could not refresh box art');
++        reject(e);
++      }
++    }.bind(this));
++  },
++
++  // Wake-on-LAN: the magic packet is sent by the native module
++  sendWOL: function () {
++    if (!this.macAddress || this.macAddress == '00:00:00:00:00:00') {
++      snackbarLogLong('Cannot wake ' + this.hostname + ': its MAC address is not known yet. Connect to the host once while it is on.');
++      return Promise.reject('unknown MAC address');
++    }
++    console.log('%c[utils.js, sendWOL]', 'color: gray;', 'Sending WOL request to ' + this.hostname + ' with mac address ' + this.macAddress);
++    return sendMessage('wakeOnLan', [this.macAddress]).then(function () {
++      snackbarLogLong('Wake-on-LAN packet sent to ' + this.hostname + '. It can take up to a minute for the PC to wake up.');
++    }.bind(this), function (error) {
++      snackbarLogLong('Could not send the Wake-on-LAN packet (error ' + error + ')');
++      return Promise.reject(error);
+     });
+   },
+ 
+diff --git a/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg b/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg
+new file mode 100644
+index 0000000..fcbf17e
+--- /dev/null
++++ b/static/res/menu_48dp_E8EAED_FILL0_wght400_GRAD0_opsz48.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 -960 960 960" width="48px" fill="#e8eaed"><path d="M120-240v-60h720v60H120Zm0-210v-60h720v60H120Zm0-210v-60h720v60H120Z"/></svg>
+\ No newline at end of file
